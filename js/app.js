@@ -189,30 +189,31 @@ function renderDashboard() {
   document.getElementById('app-content').innerHTML = `
     <div class="fade-in space-y-8">
 
-      <!-- Hero -->
-      <div class="dashboard-hero relative overflow-hidden rounded-2xl border border-[#1a2540] p-7 sm:p-8"
-           style="background:linear-gradient(135deg,#080e20 0%,#0c1430 50%,#080e20 100%);">
-        <!-- Floating flags background -->
-        <div class="absolute inset-0 flex items-center justify-end pr-8 pointer-events-none select-none" aria-hidden="true">
-          <div class="floating-flags flex gap-4 text-6xl opacity-[0.06]">
-            <span>🇺🇸</span><span>🇲🇽</span><span>🇨🇦</span>
-          </div>
-        </div>
-        <!-- Host country strip -->
-        <div class="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-amber-500/40 to-transparent"></div>
-        <div class="relative z-10">
-          <div class="flex items-center gap-2 mb-3">
-            <span class="text-[10px] font-black text-amber-500 tracking-[0.2em] uppercase">FIFA World Cup</span>
-            <span class="w-1 h-1 rounded-full bg-amber-500/40 inline-block"></span>
-            <span class="text-[10px] text-slate-600">USA · México · Canadá · 2026</span>
-          </div>
+      <!-- Countdown Hero -->
+      <div class="countdown-hero">
+        <div class="countdown-flag-bg" aria-hidden="true">🇺🇸🇲🇽🇨🇦</div>
+        <div class="relative z-10 text-center">
+          <p class="text-[10px] font-black text-amber-500 tracking-[0.25em] uppercase mb-3">FIFA World Cup 2026 · USA · México · Canadá</p>
           <h2 class="text-3xl sm:text-4xl font-black text-white mb-1 leading-none">
-            Mundial 2026 <span class="text-amber-400">Analytics</span>
+            Mundial <span class="text-amber-400">2026</span>
           </h2>
-          <p class="text-slate-500 text-sm mt-2">48 selecciones · 104 partidos · Poisson-Dixon/Coles · DoradoBet</p>
-          <div class="flex gap-2 mt-4 flex-wrap">
+          <p class="text-slate-500 text-sm mt-1 mb-5">11 de Junio — Ciudad de México / Los Ángeles / Toronto</p>
+
+          <!-- Countdown units -->
+          <div class="flex items-center justify-center gap-1 sm:gap-3 flex-wrap" id="countdown-display">
+            <div class="countdown-unit"><span class="countdown-num" id="cd-days">--</span><span class="countdown-label">días</span></div>
+            <span class="countdown-sep">:</span>
+            <div class="countdown-unit"><span class="countdown-num" id="cd-hours">--</span><span class="countdown-label">horas</span></div>
+            <span class="countdown-sep">:</span>
+            <div class="countdown-unit"><span class="countdown-num" id="cd-mins">--</span><span class="countdown-label">min</span></div>
+            <span class="countdown-sep">:</span>
+            <div class="countdown-unit"><span class="countdown-num" id="cd-secs">--</span><span class="countdown-label">seg</span></div>
+          </div>
+
+          <!-- Top 5 chips -->
+          <div class="flex gap-2 mt-5 justify-center flex-wrap">
             ${top5.slice(0,5).map(p => `
-              <div class="flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-[#1a2540] bg-[#0d1220]">
+              <div class="flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-white/10 bg-white/5 backdrop-blur-sm">
                 <span class="text-base leading-none">${p.team.flag}</span>
                 <span class="text-[11px] font-bold text-slate-300">${p.team.shortName}</span>
                 <span class="text-[10px] text-amber-400 font-mono">${p.probability}%</span>
@@ -224,24 +225,28 @@ function renderDashboard() {
       <!-- Stat cards -->
       <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div class="stat-card gold">
-          <p class="text-[10px] text-slate-600 uppercase font-bold tracking-wider mb-1">Equipos</p>
-          <p class="text-3xl font-black text-white font-mono">${TEAMS.length}</p>
-          <p class="text-[10px] text-slate-600 mt-1">${GROUPS.length} grupos</p>
+          <div class="stat-icon" style="background:var(--amber-dim)">⚽</div>
+          <p class="stat-label">Equipos</p>
+          <p class="stat-value">${TEAMS.length}</p>
+          <p class="stat-sub">${GROUPS.length} grupos · 48 naciones</p>
         </div>
         <div class="stat-card blue">
-          <p class="text-[10px] text-slate-600 uppercase font-bold tracking-wider mb-1">Partidos</p>
-          <p class="text-3xl font-black text-white font-mono">${played}<span class="text-base text-slate-600">/${FIXTURES.length}</span></p>
-          <p class="text-[10px] text-slate-600 mt-1">fase de grupos</p>
+          <div class="stat-icon" style="background:var(--blue-dim)">📅</div>
+          <p class="stat-label">Partidos</p>
+          <p class="stat-value">${played}<span style="font-size:1rem;opacity:0.4">/${FIXTURES.length}</span></p>
+          <p class="stat-sub">fase de grupos</p>
         </div>
         <div class="stat-card green">
-          <p class="text-[10px] text-slate-600 uppercase font-bold tracking-wider mb-1">Value Bets</p>
-          <p class="text-3xl font-black text-emerald-400 font-mono">${valueBets.length}</p>
-          <p class="text-[10px] text-slate-600 mt-1">detectadas</p>
+          <div class="stat-icon" style="background:var(--green-dim)">🎯</div>
+          <p class="stat-label">Value Bets</p>
+          <p class="stat-value" style="color:var(--green)">${valueBets.length}</p>
+          <p class="stat-sub">detectadas ahora</p>
         </div>
         <div class="stat-card gold">
-          <p class="text-[10px] text-slate-600 uppercase font-bold tracking-wider mb-1">Favorito</p>
-          <p class="text-2xl font-black text-white leading-none">${top5[0].team.flag} ${top5[0].team.shortName}</p>
-          <p class="text-[10px] text-amber-400 font-mono mt-1">${top5[0].probability}%</p>
+          <div class="stat-icon" style="background:var(--amber-dim)">${top5[0].team.flag}</div>
+          <p class="stat-label">Favorito</p>
+          <p class="stat-value" style="font-size:1.4rem">${top5[0].team.shortName}</p>
+          <p class="stat-sub" style="color:var(--amber)">${top5[0].probability}% de probabilidad</p>
         </div>
       </div>
 
@@ -331,6 +336,41 @@ function renderDashboard() {
       bar.style.width = bar.dataset.width + '%';
     });
   });
+
+  // Iniciar / reiniciar countdown
+  startCountdown();
+}
+
+// ——— Countdown al Mundial 2026 ———
+let _countdownInterval = null;
+function startCountdown() {
+  if (_countdownInterval) clearInterval(_countdownInterval);
+  const TARGET = new Date('2026-06-11T18:00:00-06:00'); // 6pm hora México (UTC-6)
+
+  function tick() {
+    const now  = new Date();
+    const diff = TARGET - now;
+    if (diff <= 0) {
+      ['cd-days','cd-hours','cd-mins','cd-secs'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = '00';
+      });
+      clearInterval(_countdownInterval);
+      return;
+    }
+    const d  = Math.floor(diff / 86400000);
+    const h  = Math.floor((diff % 86400000) / 3600000);
+    const m  = Math.floor((diff % 3600000)  / 60000);
+    const s  = Math.floor((diff % 60000)    / 1000);
+    const fmt = n => String(n).padStart(2, '0');
+    const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = fmt(v); };
+    set('cd-days',  d);
+    set('cd-hours', h);
+    set('cd-mins',  m);
+    set('cd-secs',  s);
+  }
+  tick();
+  _countdownInterval = setInterval(tick, 1000);
 }
 
 // ——— EQUIPOS ———
