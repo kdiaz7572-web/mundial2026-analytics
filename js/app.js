@@ -190,11 +190,11 @@ function renderDashboard() {
     <div class="fade-in space-y-8">
 
       <!-- Hero -->
-      <div class="relative overflow-hidden rounded-2xl border border-[#1a2540] p-7 sm:p-8"
+      <div class="dashboard-hero relative overflow-hidden rounded-2xl border border-[#1a2540] p-7 sm:p-8"
            style="background:linear-gradient(135deg,#080e20 0%,#0c1430 50%,#080e20 100%);">
         <!-- Floating flags background -->
         <div class="absolute inset-0 flex items-center justify-end pr-8 pointer-events-none select-none" aria-hidden="true">
-          <div class="flex gap-4 text-6xl opacity-[0.06]">
+          <div class="floating-flags flex gap-4 text-6xl opacity-[0.06]">
             <span>🇺🇸</span><span>🇲🇽</span><span>🇨🇦</span>
           </div>
         </div>
@@ -246,7 +246,7 @@ function renderDashboard() {
       </div>
 
       <!-- Top 5 + Próximos -->
-      <div class="grid md:grid-cols-2 gap-6">
+      <div class="grid md:grid-cols-2 gap-6 dashboard-main-grid">
 
         <!-- Top 5 favoritos -->
         <div class="card p-5">
@@ -300,7 +300,7 @@ function renderDashboard() {
       ${valueBets.length > 0 ? `
       <div class="card p-5">
         <h3 class="text-sm font-bold text-slate-300 uppercase tracking-wider mb-4">🎯 Alertas de Valor Activas</h3>
-        <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-3 value-bets-grid-desktop">
           ${valueBets.slice(0,3).map(v => `
             <div class="value-bet-alert p-4 rounded-xl">
               <div class="flex items-center gap-2 mb-2">
@@ -362,7 +362,7 @@ function renderTeams() {
       </div>
 
       <!-- Grid de equipos -->
-      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 teams-grid-xl">
         ${teams.map(team => {
           const p = probMap[team.shortName];
           return `
@@ -561,7 +561,7 @@ function renderCalendar() {
         `).join('')}
       </div>
 
-      <div class="grid lg:grid-cols-2 gap-6">
+      <div class="grid lg:grid-cols-2 gap-6 calendar-desktop-grid">
 
         <!-- Tabla de posiciones -->
         <div class="card overflow-hidden">
@@ -1682,9 +1682,12 @@ function renderModeloPro() {
       <p class="section-subtitle">Poisson · Dixon-Coles · Árbitros dinámicos · Cuotas en vivo DoradoBet · Detector de Edge</p>
     </div>
 
-    <!-- Panel de configuración -->
+    <!-- Desktop 2-col: config left · results right -->
+    <div class="model-desktop-layout space-y-6">
+
+    <!-- Panel de configuración (left col on desktop) -->
     <div class="card p-5 space-y-4">
-      <div class="grid sm:grid-cols-2 gap-4">
+      <div class="grid sm:grid-cols-2 xl:grid-cols-1 gap-4">
         <div>
           <label class="block text-xs text-slate-400 font-semibold uppercase mb-1">Equipo Local</label>
           <select id="mp-home" class="w-full bg-slate-800 border border-slate-700 text-white text-sm rounded-xl px-3 py-2 focus:outline-none focus:border-amber-500">
@@ -1732,8 +1735,10 @@ function renderModeloPro() {
       <p id="mp-odds-status" class="text-xs text-center text-slate-500 hidden"></p>
     </div>
 
-    <!-- Resultados -->
+    <!-- Resultados (right col on desktop) -->
     <div id="mp-results" style="display:none"></div>
+
+    </div><!-- end model-desktop-layout -->
 
   </div>`;
 }
@@ -2710,59 +2715,64 @@ function renderZakAgent() {
       </div>
     </div>
 
-    <!-- ═══ SELECTOR DE PARTIDO ═══ -->
-    <div class="card p-5">
-      <h3 class="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4">Seleccionar Partido</h3>
+    <!-- ═══ DESKTOP 2-COL: selector left · results right ═══ -->
+    <div class="zak-desktop-layout space-y-5">
 
-      <!-- Team pickers with live flag preview -->
-      <div class="grid sm:grid-cols-[1fr_auto_1fr_auto] gap-3 items-end mb-4">
-        <div>
-          <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Local</label>
-          <div class="relative">
-            <span id="zak-home-flag" class="absolute left-3 top-1/2 -translate-y-1/2 text-lg pointer-events-none leading-none">🏳️</span>
-            <select id="zak-home" onchange="zakUpdateTeams()"
-              class="zak-team-select pl-10">
-              <option value="">— Seleccionar —</option>
-              ${teamOptions}
-            </select>
+      <!-- LEFT COL: Selector de partido -->
+      <div class="card p-5">
+        <h3 class="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4">Seleccionar Partido</h3>
+
+        <!-- Team pickers with live flag preview -->
+        <div class="grid sm:grid-cols-[1fr_auto_1fr] xl:grid-cols-1 gap-3 items-end mb-4">
+          <div>
+            <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Local</label>
+            <div class="relative">
+              <span id="zak-home-flag" class="absolute left-3 top-1/2 -translate-y-1/2 text-lg pointer-events-none leading-none">🏳️</span>
+              <select id="zak-home" onchange="zakUpdateTeams()"
+                class="zak-team-select pl-10">
+                <option value="">— Seleccionar —</option>
+                ${teamOptions}
+              </select>
+            </div>
           </div>
-        </div>
 
-        <div class="flex items-end pb-2">
-          <span class="text-slate-600 font-black text-lg px-2 select-none">VS</span>
-        </div>
+          <div class="flex items-end pb-2 xl:hidden">
+            <span class="text-slate-600 font-black text-lg px-2 select-none">VS</span>
+          </div>
 
-        <div>
-          <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Visitante</label>
-          <div class="relative">
-            <span id="zak-away-flag" class="absolute left-3 top-1/2 -translate-y-1/2 text-lg pointer-events-none leading-none">🏳️</span>
-            <select id="zak-away" onchange="zakUpdateTeams()"
-              class="zak-team-select pl-10">
-              <option value="">— Seleccionar —</option>
-              ${teamOptions}
-            </select>
+          <div>
+            <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Visitante</label>
+            <div class="relative">
+              <span id="zak-away-flag" class="absolute left-3 top-1/2 -translate-y-1/2 text-lg pointer-events-none leading-none">🏳️</span>
+              <select id="zak-away" onchange="zakUpdateTeams()"
+                class="zak-team-select pl-10">
+                <option value="">— Seleccionar —</option>
+                ${teamOptions}
+              </select>
+            </div>
           </div>
         </div>
 
         <button onclick="zakAnalyze()"
-          class="px-5 py-2.5 rounded-xl font-bold text-sm text-black transition-all active:scale-95"
+          class="w-full px-5 py-2.5 rounded-xl font-bold text-sm transition-all active:scale-95 mb-4"
           style="background:linear-gradient(135deg,#7c3aed,#5b21b6);color:#fff;">
-          🔍 Analizar
+          🔍 Analizar Partido
         </button>
-      </div>
 
-      <!-- Fixture quick-load buttons -->
-      <div>
-        <p class="text-[10px] font-bold text-slate-600 uppercase tracking-wider mb-2">Próximos Partidos</p>
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2" id="zak-fixture-btns">
-          ${_zakFixtureButtons()}
+        <!-- Fixture quick-load buttons -->
+        <div>
+          <p class="text-[10px] font-bold text-slate-600 uppercase tracking-wider mb-2">Próximos Partidos</p>
+          <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-1 gap-2" id="zak-fixture-btns">
+            ${_zakFixtureButtons()}
+          </div>
         </div>
       </div>
-    </div>
 
-    <!-- Resultado del análisis -->
-    <div id="zak-result-panel">
-      ${ZAK_STATE.result ? _renderZakResult(ZAK_STATE.result) : _renderZakWelcome()}
+      <!-- RIGHT COL: Resultado del análisis -->
+      <div id="zak-result-panel">
+        ${ZAK_STATE.result ? _renderZakResult(ZAK_STATE.result) : _renderZakWelcome()}
+      </div>
+
     </div>
 
   </div>`;

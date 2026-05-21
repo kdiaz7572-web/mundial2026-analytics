@@ -908,3 +908,143 @@ input[type=number] { -moz-appearance: textfield; }
   .match-hero-score { font-size: 20px; }
   .flag-card::before { font-size: 52px; }
 }
+
+/* ──────────────────────────────────────────
+   DESKTOP LAYOUT — 1280px+
+   Priority: optimize for monitor screens
+────────────────────────────────────────── */
+
+/* Header: more horizontal breathing room */
+@media (min-width: 1280px) {
+  .app-header .max-w-7xl { max-width: 1600px; }
+
+  .nav-tab {
+    padding: 7px 15px;
+    font-size: 13px;
+  }
+
+  /* Section headers larger on desktop */
+  .section-title  { font-size: 26px; }
+  .section-subtitle { font-size: 14px; margin-bottom: 28px; }
+
+  /* Stat cards: more padding */
+  .stat-card { padding: 24px 26px; }
+  .stat-card p.text-3xl { font-size: 2.5rem; }
+
+  /* Flag card: larger watermark emoji */
+  .flag-card::before { font-size: 88px; }
+
+  /* Match hero: larger flags on desktop */
+  .match-hero { padding: 20px 28px; gap: 16px; }
+  .match-hero-flag { font-size: 3.6rem; }
+  .match-hero-score { font-size: 32px; }
+
+  /* Standings table: more comfortable */
+  .standings-table th,
+  .standings-table td { padding: 10px 14px; font-size: 13.5px; }
+
+  /* Zak pick cards */
+  .zak-pick-card { padding: 18px 22px; }
+
+  /* All market rows */
+  .zak-mkt-row { padding: 9px 16px; }
+  .zak-mkt-label { font-size: 12px; }
+  .zak-mkt-odds  { font-size: 14px; min-width: 48px; }
+  .zak-mkt-prob  { min-width: 50px; }
+  .zak-mkt-edge  { min-width: 58px; }
+
+  /* Value bet cards */
+  .vbc-header { padding: 16px 22px; }
+  .vbc-pick   { padding: 16px 22px; }
+
+  /* Modal: wider on desktop */
+  #modal-content { max-width: 900px; }
+
+  /* mp-row label: longer on desktop */
+  .mp-label { flex: 0 0 220px; }
+
+  /* Lambda card grid */
+  .lambda-card { padding: 18px 22px; margin-bottom: 20px; }
+  .lam-block .lam-val { font-size: 28px; }
+
+  /* Exact scores: 4 cols on desktop */
+  .exact-scores-grid { grid-template-columns: repeat(4, 1fr); }
+}
+
+/* ──────────────────────────────────────────
+   DESKTOP 2-COLUMN PANELS
+   For IA-Zak and Modelo Pro side-by-side
+────────────────────────────────────────── */
+@media (min-width: 1280px) {
+  /* IA-Zak: selector left + results right */
+  .zak-desktop-layout {
+    display: grid;
+    grid-template-columns: 400px 1fr;
+    gap: 24px;
+    align-items: start;
+  }
+  /* Reset Tailwind space-y when grid is active */
+  .zak-desktop-layout > * + * { margin-top: 0 !important; }
+
+  /* Modelo Pro: config left + results right */
+  .model-desktop-layout {
+    display: grid;
+    grid-template-columns: 420px 1fr;
+    gap: 24px;
+    align-items: start;
+  }
+  .model-desktop-layout > * + * { margin-top: 0 !important; }
+
+  /* Calendar: group selector top, content in 3-col on xl */
+  .calendar-desktop-grid {
+    grid-template-columns: 1fr 2fr;
+  }
+
+  /* Dashboard: top-favorites wider than upcoming */
+  .dashboard-main-grid {
+    grid-template-columns: 3fr 2fr;
+  }
+
+  /* Value bets: 4 columns on desktop */
+  .value-bets-grid-desktop {
+    grid-template-columns: repeat(4, 1fr);
+  }
+
+  /* Teams grid: 5 cols on xl */
+  .teams-grid-xl {
+    grid-template-columns: repeat(5, 1fr);
+  }
+}
+
+@media (min-width: 1536px) {
+  /* Teams grid: 6 cols on 2xl */
+  .teams-grid-xl {
+    grid-template-columns: repeat(6, 1fr);
+  }
+
+  /* Wider Zak selector on 2xl */
+  .zak-desktop-layout {
+    grid-template-columns: 440px 1fr;
+  }
+
+  /* Wider model config on 2xl */
+  .model-desktop-layout {
+    grid-template-columns: 460px 1fr;
+  }
+}
+
+/* ──────────────────────────────────────────
+   DASHBOARD HERO — taller on desktop
+────────────────────────────────────────── */
+@media (min-width: 1280px) {
+  .dashboard-hero {
+    padding: 48px 52px !important;
+  }
+  .dashboard-hero h2 {
+    font-size: 3rem !important;
+  }
+  .dashboard-hero .floating-flags {
+    font-size: 100px !important;
+    opacity: 0.05 !important;
+  }
+}
