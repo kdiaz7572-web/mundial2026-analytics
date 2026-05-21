@@ -2808,9 +2808,12 @@ function renderZakAgent() {
         </div>
       </div>
 
-      <!-- RIGHT COL: Resultado del análisis -->
-      <div id="zak-result-panel">
-        ${ZAK_STATE.result ? _renderZakResult(ZAK_STATE.result) : _renderZakWelcome()}
+      <!-- RIGHT COL: Resultado del análisis + jugadores -->
+      <div class="space-y-5">
+        <div id="zak-result-panel">
+          ${ZAK_STATE.result ? _renderZakResult(ZAK_STATE.result) : _renderZakWelcome()}
+        </div>
+        <div id="zak-player-panel"></div>
       </div>
 
     </div>
@@ -3234,6 +3237,15 @@ window.zakAnalyze = function() {
       ZAK_STATE.activeCategory = 'all';
       document.getElementById('zak-result-panel').innerHTML = _renderZakResult(result);
       if (badge) { badge.textContent = '✅ Análisis listo'; badge.className = badge.className.replace('amber','emerald'); }
+
+      // ── Render player cards for both teams ───────────────
+      _renderZakPlayerPanel(homeKey, awayKey);
+
+      // ── Persist analysis to DB ────────────────────────────
+      if (window.DB_API?.saveZakAnalysis) {
+        window.DB_API.saveZakAnalysis(homeKey, awayKey, result).catch(() => {});
+      }
+
     } catch (err) {
       console.error('[IA-Zak]', err);
       document.getElementById('zak-result-panel').innerHTML =
@@ -3241,3 +3253,110 @@ window.zakAnalyze = function() {
     }
   }, 80);
 };
+
+// ────────────────────────────────────────────────────────────
+//  PANEL DE JUGADORES — se renderiza tras el análisis de Zak
+// ────────────────────────────────────────────────────────────
+function _renderZakPlayerPanel(homeKey, awayKey) {
+  const panel = document.getElementById('zak-player-panel');
+  if (!panel) return;
+
+  const hTeam = TEAMS.find(t => t.shortName === homeKey);
+  const aTeam = TEAMS.find(t => t.shortName === awayKey);
+  if (!hTeam || !aTeam) return;
+
+  // Cargar datos de jugadores en background y re-renderizar
+  const renderCards = () => {
+    const hPlayer = hTeam.starPlayer || '';
+    const aPlayer = aTeam.starPlayer || '';
+
+    // Top 3 jugadores por equipo desde PlayerEngine
+    const hSquad = window.PlayerEngine ? PlayerEngine.getSquad(homeKey) : [];
+    const aSquad = window.PlayerEngine ? PlayerEngine.getSquad(awayKey) : [];
+
+    // Si no hay squad en cache, usamos los jugadores estrella conocidos
+    const hProfiles = hSquad.length > 0
+      ? hSquad.sort((a,b) => b.goalsPerGame - a.goalsPerGame).slice(0, 3)
+      : [hPlayer ? PlayerEngine?.getProfile(hPlayer, homeKey) : null].filter(Boolean);
+
+    const aProfiles = aSquad.length > 0
+      ? aSquad.sort((a,b) => b.goalsPerGame - a.goalsPerGame).slice(0, 3)
+      : [aPlayer ? PlayerEngine?.getProfile(aPlayer, awayKey) : null].filter(Boolean);
+
+    const buildPlayerCard = (p, accent) => {
+      if (!p) return '';
+      const g = (p.goalsPerGame||0).toFixed(2);
+      const a = (p.assistsPerGame||0).toFixed(2);
+      const sh = (p.shotsPerGame||0).toFixed(1);
+      const c = (p.cardsPerGame||0).toFixed(2);
+      return `
+        <div class="flex items-center gap-3 p-3 rounded-xl border border-white/5 bg-black/20 hover:bg-black/30 transition-colors">
+          <div class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-black shrink-0"
+               style="background:${accent}20;color:${accent}">
+            ${(p.name||'?')[0]}
+          </div>
+          <div class="flex-1 min-w-0">
+            <p class="text-xs font-bold text-white truncate">${p.name||'?'}</p>
+            <div class="flex gap-2 mt-0.5 flex-wrap">
+              <span class="text-[10px] text-emerald-400">⚽ ${g}</span>
+              <span class="text-[10px] text-blue-400">🅰️ ${a}</span>
+              <span class="text-[10px] text-amber-400">👟 ${sh}</span>
+              <span class="text-[10px] text-red-400">🟨 ${c}</span>
+            </div>
+          </div>
+          ${(p.xgPerGame||0) > 0 ? `
+          <div class="shrink-0 text-right">
+            <p class="text-[9px] text-slate-500">xG</p>
+            <p class="text-[11px] text-violet-400 font-bold">${(p.xgPerGame||0).toFixed(2)}</p>
+          </div>` : ''}
+        </div>`;
+    };
+
+    const hCards = hProfiles.map(p => buildPlayerCard(p, '#10b981')).join('') ||
+      `<p class="text-xs text-slate-600 py-2">Cargando jugadores…</p>`;
+    const aCards = aProfiles.map(p => buildPlayerCard(p, '#3b82f6')).join('') ||
+      `<p class="text-xs text-slate-600 py-2">Cargando jugadores…</p>`;
+
+    const status = window.PlayerEngine ? PlayerEngine.getStatus() : null;
+    const sourceLabel = status ? {
+      'api-football': '🌐 API en vivo',
+      'db_cache':     '💾 DB cache (6h)',
+      'local':        '📚 Base conocimiento',
+      'local_fallback':'📚 Base conocimiento',
+    }[status.source] || '📊 Stats' : '📚 Base conocimiento';
+
+    panel.innerHTML = `
+      <div class="card p-5">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="text-xs font-bold text-slate-500 uppercase tracking-widest">👥 Jugadores Clave</h3>
+          <span class="text-[9px] text-slate-600 border border-white/5 rounded-full px-2 py-0.5">${sourceLabel}</span>
+        </div>
+        <div class="grid sm:grid-cols-2 gap-4">
+          <div>
+            <p class="text-[10px] font-bold text-emerald-400 uppercase tracking-wider mb-2 flex items-center gap-1">
+              ${hTeam.flag} ${hTeam.name}
+            </p>
+            <div class="space-y-2">${hCards}</div>
+          </div>
+          <div>
+            <p class="text-[10px] font-bold text-blue-400 uppercase tracking-wider mb-2 flex items-center gap-1">
+              ${aTeam.flag} ${aTeam.name}
+            </p>
+            <div class="space-y-2">${aCards}</div>
+          </div>
+        </div>
+        ${status ? `<p class="text-[10px] text-slate-700 text-right mt-3">${status.cachedPlayers} jugadores en cache</p>` : ''}
+      </div>`;
+
+    // Prefetch in background so next time we have squad data
+    if (window.PlayerEngine) {
+      PlayerEngine.fetchTeam(homeKey).then(() => {
+        if (!document.getElementById('zak-player-panel')) return;
+        _renderZakPlayerPanel(homeKey, awayKey);
+      }).catch(() => {});
+      PlayerEngine.fetchTeam(awayKey).catch(() => {});
+    }
+  };
+
+  renderCards();
+}

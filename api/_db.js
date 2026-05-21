@@ -87,4 +87,45 @@ async function migrate(sql) {
       created_at   TIMESTAMPTZ DEFAULT NOW()
     )
   `;
+
+  // ── Player stats snapshots (from api-football.com) ────
+  await sql`
+    CREATE TABLE IF NOT EXISTS player_stats (
+      id              SERIAL PRIMARY KEY,
+      player_name     TEXT        NOT NULL,
+      player_id_api   INTEGER,
+      team_key        TEXT        NOT NULL,
+      season          TEXT        DEFAULT '2024',
+      goals           INTEGER     DEFAULT 0,
+      assists         INTEGER     DEFAULT 0,
+      games           INTEGER     DEFAULT 0,
+      minutes         INTEGER     DEFAULT 0,
+      yellow_cards    INTEGER     DEFAULT 0,
+      red_cards       INTEGER     DEFAULT 0,
+      shots_total     INTEGER     DEFAULT 0,
+      shots_on        INTEGER     DEFAULT 0,
+      goals_per_game  NUMERIC(5,3),
+      assists_per_game NUMERIC(5,3),
+      cards_per_game  NUMERIC(5,3),
+      shots_per_game  NUMERIC(5,3),
+      xg_per_game     NUMERIC(5,3),
+      raw_json        JSONB,
+      source          TEXT        DEFAULT 'api-football',
+      fetched_at      TIMESTAMPTZ DEFAULT NOW(),
+      UNIQUE(player_id_api, season)
+    )
+  `;
+
+  // ── Zak analysis log (all analyses ever run) ─────────
+  await sql`
+    CREATE TABLE IF NOT EXISTS zak_analyses (
+      id           SERIAL PRIMARY KEY,
+      home_key     TEXT        NOT NULL,
+      away_key     TEXT        NOT NULL,
+      analysis_json JSONB      NOT NULL,
+      top_pick     TEXT,
+      top_edge     NUMERIC(6,3),
+      created_at   TIMESTAMPTZ DEFAULT NOW()
+    )
+  `;
 }

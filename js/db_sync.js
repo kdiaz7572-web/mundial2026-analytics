@@ -109,6 +109,28 @@ const DB_API = {
     } catch { return null; }
   },
 
+  // ── ZAK ANALYSIS LOG ─────────────────────────────────────
+
+  async saveZakAnalysis(homeKey, awayKey, analysisResult) {
+    if (!(await this.isAvailable())) return null;
+    try {
+      const topPick = analysisResult?.picks?.[0];
+      const r = await fetch(`${this.BASE}/picks`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          homeKey,
+          awayKey,
+          picksJson:  analysisResult?.picks || [],
+          lambdaHome: analysisResult?.matchData?.lambdaHome,
+          lambdaAway: analysisResult?.matchData?.lambdaAway,
+        }),
+      });
+      const j = await r.json();
+      return j.ok ? j.pick : null;
+    } catch { return null; }
+  },
+
   // ── STATS ────────────────────────────────────────────────
 
   async getStats() {
