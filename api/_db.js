@@ -1,20 +1,30 @@
 // ============================================================
-//  DB helper — Vercel Postgres connection + auto-migration
-//  Runs CREATE TABLE IF NOT EXISTS on first request
+//  DB helper — Neon Serverless Postgres connection + auto-migration
+//  Uses DATABASE_URL injected by Vercel's Neon integration
 // ============================================================
-import { sql } from '@vercel/postgres';
+import { neon } from '@neondatabase/serverless';
 
+let _sql = null;
 let migrated = false;
 
+function getSql() {
+  if (!_sql) {
+    if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL env var not set');
+    _sql = neon(process.env.DATABASE_URL);
+  }
+  return _sql;
+}
+
 export async function getDb() {
+  const sql = getSql();
   if (!migrated) {
-    await migrate();
+    await migrate(sql);
     migrated = true;
   }
   return sql;
 }
 
-async function migrate() {
+async function migrate(sql) {
   // ── Betting history ──────────────────────────────────────
   await sql`
     CREATE TABLE IF NOT EXISTS bets (
