@@ -14,13 +14,13 @@ export default async function handler(req, res) {
       const { home, away } = req.query;
       if (!home || !away) {
         // Return all recent picks
-        const { rows } = await db`
+        const rows = await db`
           SELECT home_key, away_key, lambda_home, lambda_away, created_at
           FROM picks_cache ORDER BY created_at DESC LIMIT 50
         `;
         return res.json({ ok: true, picks: rows });
       }
-      const { rows } = await db`
+      const rows = await db`
         SELECT * FROM picks_cache
         WHERE home_key = ${home} AND away_key = ${away}
         LIMIT 1
@@ -37,7 +37,7 @@ export default async function handler(req, res) {
         ? p.picksJson
         : JSON.stringify(p.picksJson);
 
-      const { rows } = await db`
+      const rows = await db`
         INSERT INTO picks_cache (home_key, away_key, picks_json, lambda_home, lambda_away)
         VALUES (${p.homeKey}, ${p.awayKey}, ${picksJson}::jsonb, ${p.lambdaHome || null}, ${p.lambdaAway || null})
         ON CONFLICT (home_key, away_key) DO UPDATE

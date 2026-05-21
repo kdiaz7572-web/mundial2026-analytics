@@ -7,7 +7,6 @@
 import { getDb } from './_db.js';
 
 export default async function handler(req, res) {
-  // Preflight CORS
   if (req.method === 'OPTIONS') { res.status(200).end(); return; }
 
   const db = await getDb();
@@ -15,7 +14,7 @@ export default async function handler(req, res) {
   try {
     // ── GET ─────────────────────────────────────────────────
     if (req.method === 'GET') {
-      const { rows } = await db`
+      const rows = await db`
         SELECT * FROM bets ORDER BY created_at DESC LIMIT 200
       `;
       return res.json({ ok: true, bets: rows });
@@ -27,7 +26,7 @@ export default async function handler(req, res) {
       if (!b || !b.team || !b.market || !b.odds) {
         return res.status(400).json({ ok: false, error: 'Missing required fields' });
       }
-      const { rows } = await db`
+      const rows = await db`
         INSERT INTO bets
           (team, flag, market, matchup, odds, algo_prob, implied_prob,
            edge, stake, total_return, net_profit, justification)
@@ -48,7 +47,7 @@ export default async function handler(req, res) {
       if (!id || !['pending','won','lost'].includes(result)) {
         return res.status(400).json({ ok: false, error: 'Invalid id or result' });
       }
-      const { rows } = await db`
+      const rows = await db`
         UPDATE bets SET result = ${result} WHERE id = ${id} RETURNING *
       `;
       if (!rows.length) return res.status(404).json({ ok: false, error: 'Not found' });

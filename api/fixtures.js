@@ -12,7 +12,7 @@ export default async function handler(req, res) {
 
   try {
     if (req.method === 'GET') {
-      const { rows } = await db`
+      const rows = await db`
         SELECT * FROM fixture_results ORDER BY played_at DESC
       `;
       return res.json({ ok: true, fixtures: rows });
@@ -23,7 +23,7 @@ export default async function handler(req, res) {
       if (!f?.fixtureId || !f?.home || !f?.away) {
         return res.status(400).json({ ok: false, error: 'Missing fixture data' });
       }
-      const { rows } = await db`
+      const rows = await db`
         INSERT INTO fixture_results (fixture_id, home, away, home_goals, away_goals, group_name)
         VALUES (${f.fixtureId}, ${f.home}, ${f.away}, ${f.homeGoals}, ${f.awayGoals}, ${f.group || null})
         ON CONFLICT (fixture_id) DO UPDATE

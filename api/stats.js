@@ -12,7 +12,7 @@ export default async function handler(req, res) {
 
   try {
     // Overall counts
-    const { rows: counts } = await db`
+    const counts = await db`
       SELECT
         COUNT(*)                                          AS total,
         COUNT(*) FILTER (WHERE result = 'won')           AS won,
@@ -26,7 +26,7 @@ export default async function handler(req, res) {
     `;
 
     // Top markets by win rate
-    const { rows: topMarkets } = await db`
+    const topMarkets = await db`
       SELECT
         market,
         COUNT(*) AS total,
