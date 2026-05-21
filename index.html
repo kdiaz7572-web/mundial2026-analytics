@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>⚽ Mundial 2026 Analytics</title>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
+
+  <!-- Tailwind CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            navy: '#080c18',
+          },
+          fontFamily: {
+            mono: ['Fira Code', 'monospace'],
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+          }
+        }
+      }
+    };
+  </script>
+
+  <!-- Estilos propios -->
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+
+<body class="bg-[#080c18] text-slate-100 min-h-screen">
+
+  <!-- ══════════════════════════════════
+       HEADER / NAVEGACIÓN
+  ══════════════════════════════════ -->
+  <header class="app-header">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 flex items-center justify-between h-14">
+
+      <!-- Logo -->
+      <div class="flex items-center gap-3 shrink-0">
+        <div class="relative w-8 h-8 flex items-center justify-center">
+          <span class="text-xl leading-none">⚽</span>
+          <span class="absolute -top-0.5 -right-0.5 w-2 h-2 bg-amber-400 rounded-full animate-pulse"></span>
+        </div>
+        <div>
+          <h1 class="text-sm font-black text-white leading-none tracking-tight">Mundial 2026</h1>
+          <p class="text-[9px] text-amber-400 leading-none font-bold tracking-[0.2em] uppercase mt-0.5">Analytics Pro</p>
+        </div>
+      </div>
+
+      <!-- Nav escritorio -->
+      <nav class="hidden md:flex gap-0.5" id="main-nav"></nav>
+
+      <!-- Badges header -->
+      <div class="flex items-center gap-2 shrink-0">
+        <span id="live-count-badge"
+          class="hidden animate-pulse bg-red-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full tracking-wide">
+        </span>
+        <span id="value-bets-badge"
+          class="hidden bg-emerald-700/90 text-emerald-200 text-[10px] font-bold px-2 py-0.5 rounded-full">
+        </span>
+        <span id="le-status-badge"
+          class="hidden bg-violet-900/80 text-violet-300 text-[10px] font-bold px-2 py-0.5 rounded-full cursor-pointer border border-violet-700/50"
+          title="IA-Zak activo">
+        </span>
+      </div>
+    </div>
+
+    <!-- Nav móvil -->
+    <div class="md:hidden flex overflow-x-auto gap-1 px-4 pb-2 scrollbar-none" id="mobile-nav"></div>
+  </header>
+
+  <!-- ══════════════════════════════════
+       CONTENIDO PRINCIPAL
+  ══════════════════════════════════ -->
+  <main class="pt-[72px] pb-12 max-w-7xl mx-auto px-4 sm:px-6">
+    <div id="app-content">
+      <!-- Pantalla de carga -->
+      <div class="flex items-center justify-center min-h-[60vh]">
+        <div class="text-center space-y-5">
+          <!-- Flags loading ring -->
+          <div class="relative w-20 h-20 mx-auto">
+            <div class="absolute inset-0 rounded-full border-2 border-slate-800"></div>
+            <div class="absolute inset-0 rounded-full border-2 border-amber-500/30 border-t-amber-500 animate-spin"></div>
+            <div class="absolute inset-0 flex items-center justify-center text-3xl">⚽</div>
+          </div>
+          <div>
+            <p class="text-white font-bold text-base">Mundial 2026 Analytics</p>
+            <p class="text-slate-500 text-sm mt-1">Cargando datos del torneo…</p>
+          </div>
+          <div class="flex justify-center gap-1.5 text-2xl opacity-60">
+            <span>🇧🇷</span><span>🇦🇷</span><span>🇫🇷</span><span>🇪🇸</span><span>🇩🇪</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- ══════════════════════════════════
+       MODAL (detalle de equipo / info)
+  ══════════════════════════════════ -->
+  <div id="modal-overlay" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div id="modal-content"
+      class="rounded-2xl w-full max-w-2xl p-6 relative shadow-2xl overflow-y-auto" style="max-height:90vh;">
+      <button onclick="closeModal()"
+        class="absolute top-4 right-4 text-slate-500 hover:text-white text-2xl leading-none transition-colors"
+        aria-label="Cerrar">
+        &times;
+      </button>
+      <div id="modal-body"></div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════
+       SCRIPTS (orden de dependencias)
+  ══════════════════════════════════ -->
+  <script src="js/data.js"></script>
+  <script src="js/squads.js"></script>
+  <script src="js/algorithm.js"></script>
+  <script src="js/data_extended.js"></script>
+  <script src="js/math_model.js"></script>
+  <script src="js/state_manager.js"></script>
+  <script src="js/referee_engine.js"></script>
+  <script src="js/live_engine.js"></script>
+  <script src="js/odds_engine.js"></script>
+  <script src="js/picks_engine.js"></script>
+  <script src="js/learning_engine.js"></script>
+  <script src="js/zak_agent.js"></script>
+  <script src="js/zak_knowledge.js"></script>
+  <script src="js/app.js"></script>
+  <script src="js/db_sync.js"></script>   <!-- Vercel Postgres bridge -->
+</body>
+</html>

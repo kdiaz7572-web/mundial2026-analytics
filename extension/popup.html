@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Mundial 2026 Analytics</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      width: 360px;
+      min-height: 200px;
+      background: #0a0f1e;
+      color: #e2e8f0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 12px;
+    }
+
+    /* Header */
+    .header {
+      background: linear-gradient(135deg, #1e1b4b, #0f172a);
+      padding: 12px 16px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      border-bottom: 1px solid #1e293b;
+    }
+    .header-logo { font-size: 22px; }
+    .header-title { font-size: 14px; font-weight: 800; color: #fff; }
+    .header-sub { font-size: 9px; color: #f59e0b; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; }
+    .badge-live {
+      margin-left: auto;
+      background: #ef4444;
+      color: #fff;
+      font-size: 9px;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 99px;
+      animation: pulse 1.5s infinite;
+    }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.6} }
+
+    /* Stats bar */
+    .stats-bar {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      border-bottom: 1px solid #1e293b;
+    }
+    .stat-cell {
+      padding: 8px 12px;
+      text-align: center;
+      border-right: 1px solid #1e293b;
+    }
+    .stat-cell:last-child { border-right: none; }
+    .stat-val { font-size: 18px; font-weight: 800; color: #f59e0b; }
+    .stat-val.green { color: #10b981; }
+    .stat-lbl { font-size: 9px; color: #64748b; margin-top: 1px; }
+
+    /* Status bar */
+    .status-bar {
+      padding: 6px 14px;
+      background: #0f172a;
+      border-bottom: 1px solid #1e293b;
+      font-size: 10px;
+      color: #475569;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .dot { width: 6px; height: 6px; border-radius: 50%; background: #475569; }
+    .dot.active { background: #10b981; animation: pulse 1.5s infinite; }
+
+    /* Empty state */
+    .empty {
+      padding: 24px 16px;
+      text-align: center;
+      color: #475569;
+    }
+    .empty-icon { font-size: 32px; margin-bottom: 8px; }
+    .empty-txt { font-size: 11px; }
+    .open-btn {
+      margin-top: 12px;
+      padding: 7px 16px;
+      background: linear-gradient(135deg, #7c3aed, #4f46e5);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    /* Match list */
+    .match-list { max-height: 380px; overflow-y: auto; }
+    .match-card {
+      padding: 10px 14px;
+      border-bottom: 1px solid #1e293b;
+      cursor: default;
+    }
+    .match-card:last-child { border-bottom: none; }
+    .match-card.has-value { border-left: 3px solid #10b981; padding-left: 11px; }
+    .match-teams {
+      font-weight: 700;
+      color: #fff;
+      font-size: 11px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      margin-bottom: 5px;
+    }
+    .match-league { font-size: 9px; color: #64748b; margin-bottom: 5px; }
+    .odds-row {
+      display: flex;
+      gap: 4px;
+      margin-bottom: 4px;
+    }
+    .odd-chip {
+      flex: 1;
+      background: #1e293b;
+      border-radius: 5px;
+      padding: 3px 4px;
+      text-align: center;
+      border: 1px solid #334155;
+      font-size: 10px;
+    }
+    .odd-chip.value-bet {
+      background: rgba(16,185,129,0.15);
+      border-color: #10b981;
+    }
+    .odd-chip.strong-value {
+      background: rgba(245,158,11,0.15);
+      border-color: #f59e0b;
+    }
+    .odd-lbl { color: #64748b; font-size: 8px; }
+    .odd-val { color: #fbbf24; font-weight: 700; }
+    .odd-edge { font-size: 8px; font-weight: 600; }
+    .odd-edge.pos { color: #34d399; }
+    .odd-edge.neg { color: #f87171; }
+
+    /* Footer */
+    .footer {
+      padding: 8px 14px;
+      background: #0f172a;
+      border-top: 1px solid #1e293b;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .footer-link {
+      font-size: 10px;
+      color: #7c3aed;
+      cursor: pointer;
+      text-decoration: underline;
+    }
+    .refresh-btn {
+      font-size: 10px;
+      background: #1e293b;
+      color: #94a3b8;
+      border: 1px solid #334155;
+      border-radius: 5px;
+      padding: 3px 8px;
+      cursor: pointer;
+    }
+    .refresh-btn:hover { background: #334155; }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <div class="header-logo">⚽</div>
+    <div>
+      <div class="header-title">Mundial 2026 Analytics</div>
+      <div class="header-sub">DoradoBet Edge Detector</div>
+    </div>
+    <span class="badge-live" id="live-badge" style="display:none">● LIVE</span>
+  </div>
+
+  <div class="stats-bar">
+    <div class="stat-cell">
+      <div class="stat-val" id="stat-matches">—</div>
+      <div class="stat-lbl">Partidos</div>
+    </div>
+    <div class="stat-cell">
+      <div class="stat-val green" id="stat-value">—</div>
+      <div class="stat-lbl">Value Bets</div>
+    </div>
+    <div class="stat-cell">
+      <div class="stat-val" id="stat-update">—</div>
+      <div class="stat-lbl">Actualizado</div>
+    </div>
+  </div>
+
+  <div class="status-bar">
+    <div class="dot" id="status-dot"></div>
+    <span id="status-txt">Conectando a DoradoBet…</span>
+  </div>
+
+  <div id="content">
+    <div class="empty">
+      <div class="empty-icon">🔍</div>
+      <div class="empty-txt">Abre DoradoBet para detectar cuotas</div>
+      <button class="open-btn" id="open-doradobet">Abrir DoradoBet</button>
+    </div>
+  </div>
+
+  <div class="footer">
+    <span class="footer-link" id="open-app">🔗 Abrir App Análisis</span>
+    <button class="refresh-btn" id="refresh-btn">↻ Actualizar</button>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

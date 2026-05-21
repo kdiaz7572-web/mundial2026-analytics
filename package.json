@@ -1,0 +1,16 @@
+{
+  "name": "mundial2026-analytics",
+  "version": "1.0.0",
+  "description": "Mundial 2026 Analytics Pro — Vercel + Postgres",
+  "private": true,
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@vercel/postgres": "^0.10.0"
+  },
+  "scripts": {
+    "dev": "vercel dev",
+    "deploy": "vercel --prod"
+  }
+}
