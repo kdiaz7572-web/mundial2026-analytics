@@ -3227,7 +3227,7 @@ window.zakAnalyze = function() {
       <p class="text-slate-400">IA-Zak calculando ${homeKey} vs ${awayKey}...</p>
     </div>`;
 
-  // Pequeño delay para dejar que el DOM actualice
+  // Delay para dejar que el DOM pinte el spinner antes del cálculo
   setTimeout(() => {
     try {
       const result = ZakAgent.refreshForFixture(homeKey, awayKey);
@@ -3251,7 +3251,7 @@ window.zakAnalyze = function() {
       document.getElementById('zak-result-panel').innerHTML =
         `<div class="card p-6 text-center text-red-400">⚠️ Error: ${err.message}</div>`;
     }
-  }, 80);
+  }, 50);
 };
 
 // ────────────────────────────────────────────────────────────
@@ -3348,13 +3348,22 @@ function _renderZakPlayerPanel(homeKey, awayKey) {
         ${status ? `<p class="text-[10px] text-slate-700 text-right mt-3">${status.cachedPlayers} jugadores en cache</p>` : ''}
       </div>`;
 
-    // Prefetch in background so next time we have squad data
+    // Prefetch en background — SIN llamada recursiva (evita infinite microtask loop)
     if (window.PlayerEngine) {
-      PlayerEngine.fetchTeam(homeKey).then(() => {
-        if (!document.getElementById('zak-player-panel')) return;
-        _renderZakPlayerPanel(homeKey, awayKey);
-      }).catch(() => {});
-      PlayerEngine.fetchTeam(awayKey).catch(() => {});
+      const alreadyFetched = PlayerEngine.getSquad(homeKey).length > 0 &&
+                             PlayerEngine.getSquad(awayKey).length > 0;
+      if (!alreadyFetched) {
+        Promise.all([
+          PlayerEngine.fetchTeam(homeKey),
+          PlayerEngine.fetchTeam(awayKey),
+        ]).then(() => {
+          // Re-render una sola vez después de que lleguen los datos
+          requestAnimationFrame(() => {
+            const freshPanel = document.getElementById('zak-player-panel');
+            if (freshPanel) renderCards();
+          });
+        }).catch(() => {});
+      }
     }
   };
 
