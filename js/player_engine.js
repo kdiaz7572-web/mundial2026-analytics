@@ -140,7 +140,7 @@ const PlayerEngine = (() => {
 
     // 2. ZAK_KNOWLEDGE (stats 2024-25 consolidadas)
     if (typeof ZAK_KNOWLEDGE !== 'undefined') {
-      const zkData = ZAK_KNOWLEDGE.getPlayerStats(playerName);
+      const zkData = ZAK_KNOWLEDGE.getPlayer(playerName);
       if (zkData) {
         return {
           name:           playerName,
