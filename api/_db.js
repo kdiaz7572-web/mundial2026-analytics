@@ -128,4 +128,31 @@ async function migrate(sql) {
       created_at   TIMESTAMPTZ DEFAULT NOW()
     )
   `;
+
+  // ── Zak Intel — daily Perplexity research results ────
+  await sql`
+    CREATE TABLE IF NOT EXISTS zak_intel (
+      id           SERIAL PRIMARY KEY,
+      topic        TEXT        NOT NULL,
+      content      TEXT        NOT NULL,
+      summary_json JSONB,
+      studied_at   TIMESTAMPTZ DEFAULT NOW()
+    )
+  `;
+
+  // ── Zak team intel — per-team research cache ─────────
+  await sql`
+    CREATE TABLE IF NOT EXISTS zak_team_intel (
+      id           SERIAL PRIMARY KEY,
+      team_key     TEXT        NOT NULL UNIQUE,
+      injuries     TEXT,
+      form_notes   TEXT,
+      news         TEXT,
+      odds_notes   TEXT,
+      attack_mod   NUMERIC(4,3) DEFAULT 1.0,
+      defense_mod  NUMERIC(4,3) DEFAULT 1.0,
+      confidence   TEXT        DEFAULT 'medium',
+      updated_at   TIMESTAMPTZ DEFAULT NOW()
+    )
+  `;
 }

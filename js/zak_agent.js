@@ -72,6 +72,50 @@ const ZakAgent = (() => {
     analysisCache: {},     // matchKey → analysis result
   };
 
+  // ── Intel de equipos (desde Perplexity / DB) ───────────────
+  let _teamIntel = {};   // teamKey → { attack_mod, defense_mod, injuries, form_notes }
+  let _intelLoaded = false;
+
+  async function loadTeamIntel() {
+    if (_intelLoaded) return;
+    try {
+      const res  = await fetch('/api/intel');
+      const data = await res.json();
+      if (data.ok && data.teamMods) {
+        for (const row of data.teamMods) {
+          _teamIntel[row.team_key] = {
+            attackMod:   parseFloat(row.attack_mod)  || 1.0,
+            defenseMod:  parseFloat(row.defense_mod) || 1.0,
+            injuries:    row.injuries  || '',
+            formNotes:   row.form_notes || '',
+          };
+        }
+        _intelLoaded = true;
+      }
+    } catch {}
+  }
+
+  // Apply intel modifiers to Poisson lambdas
+  function _applyIntelMods(homeKey, awayKey, lH, lA) {
+    const hIntel = _teamIntel[homeKey] || _teamIntel[homeKey?.toUpperCase()];
+    const aIntel = _teamIntel[awayKey] || _teamIntel[awayKey?.toUpperCase()];
+    let newLH = lH, newLA = lA;
+    if (hIntel) {
+      // Home attack boosted / reduced
+      newLH = +(lH * hIntel.attackMod).toFixed(3);
+      // Away defense modifier affects how many goals home scores
+      if (aIntel) newLH = +(newLH * (2 - aIntel.defenseMod)).toFixed(3);
+    }
+    if (aIntel) {
+      newLA = +(lA * aIntel.attackMod).toFixed(3);
+      if (hIntel) newLA = +(newLA * (2 - hIntel.defenseMod)).toFixed(3);
+    }
+    // Clamp to reasonable range
+    newLH = Math.min(4.5, Math.max(0.3, newLH));
+    newLA = Math.min(4.5, Math.max(0.3, newLA));
+    return { lH: newLH, lA: newLA };
+  }
+
   // ────────────────────────────────────────────────────────────
   //  MERCADOS CONOCIDOS DE DORADOBET (CONOCIMIENTO BASE)
   // ────────────────────────────────────────────────────────────
@@ -299,8 +343,13 @@ const ZakAgent = (() => {
       return { error: `No se pudo analizar ${homeKey} vs ${awayKey}` };
     }
 
-    const lH = analysis.lambdas.home;
-    const lA = analysis.lambdas.away;
+    let lH = analysis.lambdas.home;
+    let lA = analysis.lambdas.away;
+
+    // ── Apply Perplexity intel modifiers (injuries/form) ─────
+    const intelMods = _applyIntelMods(homeKey, awayKey, lH, lA);
+    lH = intelMods.lH;
+    lA = intelMods.lA;
 
     // ── Distribución Poisson ─────────────────────────────────
     const P = _poissonMatrix(lH, lA, 6); // matriz 7×7
@@ -914,6 +963,10 @@ const ZakAgent = (() => {
       studyLogEntries: _state.studyLog.length,
       lastAnalysis: _state.lastAnalysis,
     }),
+
+    // Cargar intel de equipos desde DB (llamar al inicio)
+    loadTeamIntel,
+    getTeamIntel: () => ({ ..._teamIntel }),
 
     // Llamar desde el UI para refrescar picks del fixture actual
     refreshForFixture(homeKey, awayKey, odds = {}) {

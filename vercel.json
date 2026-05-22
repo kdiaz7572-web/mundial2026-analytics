@@ -3,6 +3,12 @@
   "name": "mundial2026-analytics",
   "buildCommand": "npm install",
   "outputDirectory": ".",
+  "crons": [
+    {
+      "path": "/api/learn",
+      "schedule": "0 6 * * *"
+    }
+  ],
   "headers": [
     {
       "source": "/api/(.*)",

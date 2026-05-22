@@ -14,14 +14,11 @@ const STATE = {
 };
 
 const TABS = [
-  { id: 'dashboard',    label: '📊 Dashboard' },
-  { id: 'equipos',      label: '🌍 Equipos' },
-  { id: 'calendario',   label: '📅 Calendario' },
-  { id: 'predicciones', label: '🔮 Predicciones' },
-  { id: 'apuestas',     label: '💡 Apuestas' },
-  { id: 'historial',    label: '📋 Historial' },
-  { id: 'modelo',       label: '⚡ Modelo Pro' },
-  { id: 'zak',          label: '🤖 IA-Zak' },
+  { id: 'dashboard',  label: '📊 Dashboard' },
+  { id: 'equipos',    label: '🌍 Equipos' },
+  { id: 'calendario', label: '📅 Calendario' },
+  { id: 'apuestas',   label: '💡 Apuestas' },
+  { id: 'zak',        label: '🤖 IA-Zak' },
 ];
 
 const CONFEDERATIONS = ['ALL','UEFA','CONMEBOL','CONCACAF','CAF','AFC','OFC'];
@@ -1691,14 +1688,11 @@ function switchTab(tab) {
   STATE.currentTab = tab;
   renderNav();
   const renders = {
-    dashboard:    renderDashboard,
-    equipos:      renderTeams,
-    calendario:   renderCalendar,
-    predicciones: renderPredictions,
-    apuestas:     renderBetting,
-    historial:    renderHistory,
-    modelo:       renderModeloPro,
-    zak:          renderZakAgent,
+    dashboard:  renderDashboard,
+    equipos:    renderTeams,
+    calendario: renderCalendar,
+    apuestas:   renderBetting,
+    zak:        renderZakAgent,
   };
   if (renders[tab]) renders[tab]();
   window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -2577,7 +2571,7 @@ function init() {
     if (tab === 'calendario') {
       // Re-render sin hacer scroll, para no interrumpir la visualización en vivo
       renderCalendar();
-    } else if (['dashboard','predicciones'].includes(tab)) {
+    } else if (tab === 'dashboard') {
       switchTab(tab);
     }
     _updateLiveBadge();
@@ -2619,6 +2613,13 @@ function init() {
   setTimeout(() => {
     PicksEngine.generateDailyPicks(6).catch(e => console.warn('[Picks]', e));
   }, 1500);
+
+  // Cargar intel de equipos en segundo plano (afecta lambdas de ZakAgent)
+  setTimeout(() => {
+    if (typeof ZakAgent !== 'undefined' && ZakAgent.loadTeamIntel) {
+      ZakAgent.loadTeamIntel().catch(() => {});
+    }
+  }, 2000);
 }
 
 // ──────────────────────────────────────────────────────────────
@@ -2755,6 +2756,29 @@ function renderZakAgent() {
       </div>
     </div>
 
+    <!-- ═══ INTEL DAILY BRIEF ═══ -->
+    <div id="zak-intel-panel" class="card p-4">
+      <div class="flex items-center justify-between mb-3">
+        <div class="flex items-center gap-2">
+          <span class="text-lg">🧠</span>
+          <div>
+            <p class="text-sm font-bold text-white">Intel Diario</p>
+            <p class="text-[10px] text-slate-500" id="zak-intel-timestamp">Cargando…</p>
+          </div>
+        </div>
+        <button onclick="zakRefreshIntel()" title="Estudiar ahora"
+          class="text-[10px] px-3 py-1.5 rounded-lg border border-violet-700/50 text-violet-400 hover:bg-violet-900/40 transition-colors font-bold">
+          🔄 Actualizar
+        </button>
+      </div>
+      <div id="zak-intel-content" class="text-xs text-slate-400 leading-relaxed">
+        <div class="flex items-center gap-2 text-slate-600">
+          <div class="w-4 h-4 border-2 border-violet-800 border-t-violet-400 rounded-full animate-spin"></div>
+          Cargando inteligencia del Mundial…
+        </div>
+      </div>
+    </div>
+
     <!-- ═══ DESKTOP 2-COL: selector left · results right ═══ -->
     <div class="zak-desktop-layout space-y-5">
 
@@ -2828,6 +2852,121 @@ function renderZakAgent() {
   if (ZAK_STATE.awayKey) {
     const sel = document.getElementById('zak-away');
     if (sel) { sel.value = ZAK_STATE.awayKey; _zakUpdateFlagPreview(); }
+  }
+
+  // Load intel in background (non-blocking)
+  _loadZakIntel();
+}
+
+// ── Intel loader ────────────────────────────────────────────
+async function _loadZakIntel() {
+  try {
+    const res  = await fetch('/api/intel');
+    const data = await res.json();
+    _renderZakIntelPanel(data);
+  } catch {
+    const el = document.getElementById('zak-intel-content');
+    if (el) el.innerHTML = '<span class="text-slate-600 text-[11px]">Sin conexión con el servidor de intel.</span>';
+  }
+}
+
+function _renderZakIntelPanel(data) {
+  const ts  = document.getElementById('zak-intel-timestamp');
+  const el  = document.getElementById('zak-intel-content');
+  if (!el) return;
+
+  if (!data.ok || (!data.lastStudied && !data.oddsNews)) {
+    el.innerHTML = `
+      <div class="flex items-center justify-between p-3 rounded-xl border border-amber-900/40 bg-amber-900/10">
+        <p class="text-[11px] text-amber-400">IA-Zak aún no ha estudiado. Pulsa <strong>Actualizar</strong> para iniciar el primer estudio.</p>
+      </div>`;
+    if (ts) ts.textContent = 'Sin datos todavía';
+    return;
+  }
+
+  if (ts && data.lastStudied) {
+    const d = new Date(data.lastStudied);
+    ts.textContent = `Último estudio: ${d.toLocaleDateString('es-ES',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})}`;
+  }
+
+  const teamMods = data.teamMods || [];
+  const injured  = teamMods.filter(t => t.injuries && t.injuries.length > 10).slice(0, 4);
+
+  // Build intel cards
+  let html = '<div class="space-y-3">';
+
+  // Odds/news brief
+  if (data.oddsNews) {
+    const brief = data.oddsNews.substring(0, 400);
+    html += `
+      <div class="p-3 rounded-xl border border-slate-700/50 bg-slate-800/30">
+        <p class="text-[10px] font-bold text-violet-400 uppercase tracking-wider mb-1.5">📰 Análisis de Mercado</p>
+        <p class="text-[11px] text-slate-300 leading-relaxed">${brief}${data.oddsNews.length > 400 ? '…' : ''}</p>
+      </div>`;
+  }
+
+  // Injured teams
+  if (injured.length) {
+    html += `
+      <div class="p-3 rounded-xl border border-red-900/30 bg-red-900/10">
+        <p class="text-[10px] font-bold text-red-400 uppercase tracking-wider mb-2">🏥 Lesiones / Bajas Clave</p>
+        <div class="space-y-1.5">
+          ${injured.map(t => `
+            <div class="flex items-start gap-2">
+              <span class="text-[10px] font-bold text-white min-w-[80px]">${t.team_key}</span>
+              <span class="text-[10px] text-slate-400 leading-tight">${t.injuries}</span>
+            </div>`).join('')}
+        </div>
+      </div>`;
+  }
+
+  // Team modifier summary
+  const boosted  = teamMods.filter(t => parseFloat(t.attack_mod) > 1.05).slice(0,3);
+  const weakened = teamMods.filter(t => parseFloat(t.defense_mod) < 0.95).slice(0,3);
+  if (boosted.length || weakened.length) {
+    html += `
+      <div class="grid grid-cols-2 gap-2">
+        ${boosted.length ? `<div class="p-2.5 rounded-xl border border-emerald-900/30 bg-emerald-900/10">
+          <p class="text-[10px] font-bold text-emerald-400 mb-1.5">🟢 Ataque Reforzado</p>
+          ${boosted.map(t => `<p class="text-[10px] text-slate-300">${t.team_key} <span class="text-emerald-400 font-mono">×${parseFloat(t.attack_mod).toFixed(2)}</span></p>`).join('')}
+        </div>` : ''}
+        ${weakened.length ? `<div class="p-2.5 rounded-xl border border-red-900/30 bg-red-900/10">
+          <p class="text-[10px] font-bold text-red-400 mb-1.5">🔴 Defensa Debilitada</p>
+          ${weakened.map(t => `<p class="text-[10px] text-slate-300">${t.team_key} <span class="text-red-400 font-mono">×${parseFloat(t.defense_mod).toFixed(2)}</span></p>`).join('')}
+        </div>` : ''}
+      </div>`;
+  }
+
+  if (html === '<div class="space-y-3">') {
+    html += `<p class="text-slate-500 text-[11px]">No hay intel disponible todavía. Pulsa Actualizar.</p>`;
+  }
+  html += '</div>';
+  el.innerHTML = html;
+}
+
+async function zakRefreshIntel() {
+  const btn = document.querySelector('[onclick="zakRefreshIntel()"]');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Estudiando…'; }
+  const el = document.getElementById('zak-intel-content');
+  if (el) el.innerHTML = `
+    <div class="flex items-center gap-2 text-slate-400 text-[11px]">
+      <div class="w-4 h-4 border-2 border-violet-800 border-t-violet-400 rounded-full animate-spin"></div>
+      IA-Zak está investigando el Mundial 2026 ahora mismo…
+    </div>`;
+
+  try {
+    const res  = await fetch('/api/learn?force=1');
+    const data = await res.json();
+    if (data.ok) {
+      // Reload intel after study
+      await _loadZakIntel();
+    } else {
+      if (el) el.innerHTML = `<p class="text-red-400 text-[11px]">Error: ${data.error || 'Fallo al estudiar'}</p>`;
+    }
+  } catch (e) {
+    if (el) el.innerHTML = `<p class="text-red-400 text-[11px]">Error de red: ${e.message}</p>`;
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '🔄 Actualizar'; }
   }
 }
 
