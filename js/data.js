@@ -44,9 +44,9 @@ const TEAMS = [
   { id:11, name:"Japón",          shortName:"JPN", flag:"🇯🇵", group:"C", confederation:"AFC",
     fifaRanking:17, color:"#bc002d", recentForm:["W","W","D","W","W","L","W","W","D","W"],
     goalsScored:1.6, goalsConceded:1.1, starPlayerValue:76, starPlayer:"T. Minamino" },
-  { id:12, name:"Georgia",        shortName:"GEO", flag:"🇬🇪", group:"C", confederation:"UEFA",
-    fifaRanking:65, color:"#da121a", recentForm:["W","L","D","W","L","W","D","L","W","D"],
-    goalsScored:1.0, goalsConceded:1.7, starPlayerValue:45, starPlayer:"K. Kvaratskhelia" },
+  { id:12, name:"Jamaica",        shortName:"JAM", flag:"🇯🇲", group:"C", confederation:"CONCACAF",
+    fifaRanking:54, color:"#007a5e", recentForm:["W","D","L","W","D","W","L","W","D","L"],
+    goalsScored:1.1, goalsConceded:1.5, starPlayerValue:42, starPlayer:"J. Bailey" },
 
   // ——— GRUPO D ———
   { id:13, name:"Argentina",      shortName:"ARG", flag:"🇦🇷", group:"D", confederation:"CONMEBOL",
@@ -58,9 +58,9 @@ const TEAMS = [
   { id:15, name:"Arabia Saudita", shortName:"KSA", flag:"🇸🇦", group:"D", confederation:"AFC",
     fifaRanking:56, color:"#006c35", recentForm:["W","L","D","W","L","D","W","L","W","D"],
     goalsScored:1.2, goalsConceded:1.8, starPlayerValue:55, starPlayer:"S. Al-Dawsari" },
-  { id:16, name:"Mali",           shortName:"MLI", flag:"🇲🇱", group:"D", confederation:"CAF",
-    fifaRanking:55, color:"#14b53a", recentForm:["W","D","L","W","W","D","W","L","D","W"],
-    goalsScored:1.0, goalsConceded:1.5, starPlayerValue:42, starPlayer:"M. Samaké" },
+  { id:16, name:"Bélgica",        shortName:"BEL", flag:"🇧🇪", group:"D", confederation:"UEFA",
+    fifaRanking:9,  color:"#1e50a0", recentForm:["W","D","W","W","D","W","D","W","W","D"],
+    goalsScored:2.0, goalsConceded:0.9, starPlayerValue:85, starPlayer:"K. De Bruyne" },
 
   // ——— GRUPO E ———
   { id:17, name:"Brasil",         shortName:"BRA", flag:"🇧🇷", group:"E", confederation:"CONMEBOL",
@@ -108,12 +108,12 @@ const TEAMS = [
   { id:29, name:"Portugal",       shortName:"POR", flag:"🇵🇹", group:"H", confederation:"UEFA",
     fifaRanking:6,  color:"#006600", recentForm:["W","W","W","W","D","W","D","W","W","W"],
     goalsScored:2.2, goalsConceded:0.9, starPlayerValue:93, starPlayer:"C. Ronaldo" },
-  { id:30, name:"Costa Rica",     shortName:"CRC", flag:"🇨🇷", group:"H", confederation:"CONCACAF",
-    fifaRanking:47, color:"#002b7f", recentForm:["D","W","L","D","W","L","W","D","L","W"],
-    goalsScored:1.0, goalsConceded:1.6, starPlayerValue:50, starPlayer:"K. Fuller" },
-  { id:31, name:"Iraq",           shortName:"IRQ", flag:"🇮🇶", group:"H", confederation:"AFC",
-    fifaRanking:58, color:"#007a3d", recentForm:["W","D","L","W","W","D","L","W","D","W"],
-    goalsScored:1.1, goalsConceded:1.5, starPlayerValue:44, starPlayer:"A. Ali" },
+  { id:30, name:"Qatar",          shortName:"QAT", flag:"🇶🇦", group:"H", confederation:"AFC",
+    fifaRanking:66, color:"#8B0000", recentForm:["W","L","D","W","W","D","L","W","D","W"],
+    goalsScored:1.2, goalsConceded:1.4, starPlayerValue:48, starPlayer:"A. Al-Haydos" },
+  { id:31, name:"Albania",        shortName:"ALB", flag:"🇦🇱", group:"H", confederation:"UEFA",
+    fifaRanking:62, color:"#C60C30", recentForm:["W","D","W","L","W","D","W","D","L","W"],
+    goalsScored:1.3, goalsConceded:1.3, starPlayerValue:50, starPlayer:"A. Rama" },
   { id:32, name:"Egipto",         shortName:"EGY", flag:"🇪🇬", group:"H", confederation:"CAF",
     fifaRanking:38, color:"#ce1126", recentForm:["W","W","D","W","L","W","D","L","W","W"],
     goalsScored:1.3, goalsConceded:1.2, starPlayerValue:68, starPlayer:"M. Salah" },
@@ -153,9 +153,9 @@ const TEAMS = [
   { id:42, name:"Turquía",        shortName:"TUR", flag:"🇹🇷", group:"K", confederation:"UEFA",
     fifaRanking:29, color:"#e30a17", recentForm:["W","W","D","W","L","D","W","W","D","W"],
     goalsScored:1.5, goalsConceded:1.2, starPlayerValue:72, starPlayer:"H. Çalhanoğlu" },
-  { id:43, name:"Indonesia",      shortName:"IDN", flag:"🇮🇩", group:"K", confederation:"AFC",
-    fifaRanking:88, color:"#ce1126", recentForm:["L","D","W","L","W","D","L","W","L","D"],
-    goalsScored:0.8, goalsConceded:2.0, starPlayerValue:30, starPlayer:"M. Struijk" },
+  { id:43, name:"Escocia",        shortName:"SCO", flag:"🏴󠁧󠁢󠁳󠁣󠁴󠁿", group:"K", confederation:"UEFA",
+    fifaRanking:38, color:"#003366", recentForm:["D","W","L","W","D","W","D","L","W","D"],
+    goalsScored:1.4, goalsConceded:1.2, starPlayerValue:68, starPlayer:"A. Robertson" },
   { id:44, name:"Nueva Zelanda",  shortName:"NZL", flag:"🇳🇿", group:"K", confederation:"OFC",
     fifaRanking:95, color:"#00247d", recentForm:["D","L","W","D","L","W","D","L","W","D"],
     goalsScored:0.8, goalsConceded:2.0, starPlayerValue:35, starPlayer:"C. Wood" },
@@ -196,19 +196,19 @@ const FIXTURES = [
 
   // == GRUPO C ==
   { id:13, group:"C", matchday:1, date:"2026-06-12", time:"21:00", home:"CAN", away:"HON", homeGoals:null, awayGoals:null },
-  { id:14, group:"C", matchday:1, date:"2026-06-13", time:"12:00", home:"JPN", away:"GEO", homeGoals:null, awayGoals:null },
+  { id:14, group:"C", matchday:1, date:"2026-06-13", time:"12:00", home:"JPN", away:"JAM", homeGoals:null, awayGoals:null },
   { id:15, group:"C", matchday:2, date:"2026-06-18", time:"18:00", home:"CAN", away:"JPN", homeGoals:null, awayGoals:null },
-  { id:16, group:"C", matchday:2, date:"2026-06-18", time:"15:00", home:"GEO", away:"HON", homeGoals:null, awayGoals:null },
-  { id:17, group:"C", matchday:3, date:"2026-06-25", time:"20:00", home:"CAN", away:"GEO", homeGoals:null, awayGoals:null },
+  { id:16, group:"C", matchday:2, date:"2026-06-18", time:"15:00", home:"JAM", away:"HON", homeGoals:null, awayGoals:null },
+  { id:17, group:"C", matchday:3, date:"2026-06-25", time:"20:00", home:"CAN", away:"JAM", homeGoals:null, awayGoals:null },
   { id:18, group:"C", matchday:3, date:"2026-06-25", time:"20:00", home:"JPN", away:"HON", homeGoals:null, awayGoals:null },
 
   // == GRUPO D ==
   { id:19, group:"D", matchday:1, date:"2026-06-13", time:"15:00", home:"ARG", away:"KSA", homeGoals:null, awayGoals:null },
-  { id:20, group:"D", matchday:1, date:"2026-06-13", time:"18:00", home:"ESP", away:"MLI", homeGoals:null, awayGoals:null },
-  { id:21, group:"D", matchday:2, date:"2026-06-19", time:"15:00", home:"ARG", away:"MLI", homeGoals:null, awayGoals:null },
+  { id:20, group:"D", matchday:1, date:"2026-06-13", time:"18:00", home:"ESP", away:"BEL", homeGoals:null, awayGoals:null },
+  { id:21, group:"D", matchday:2, date:"2026-06-19", time:"15:00", home:"ARG", away:"BEL", homeGoals:null, awayGoals:null },
   { id:22, group:"D", matchday:2, date:"2026-06-19", time:"18:00", home:"ESP", away:"KSA", homeGoals:null, awayGoals:null },
   { id:23, group:"D", matchday:3, date:"2026-06-26", time:"20:00", home:"ARG", away:"ESP", homeGoals:null, awayGoals:null },
-  { id:24, group:"D", matchday:3, date:"2026-06-26", time:"20:00", home:"KSA", away:"MLI", homeGoals:null, awayGoals:null },
+  { id:24, group:"D", matchday:3, date:"2026-06-26", time:"20:00", home:"KSA", away:"BEL", homeGoals:null, awayGoals:null },
 
   // == GRUPO E ==
   { id:25, group:"E", matchday:1, date:"2026-06-14", time:"12:00", home:"BRA", away:"AUS", homeGoals:null, awayGoals:null },
@@ -235,12 +235,12 @@ const FIXTURES = [
   { id:42, group:"G", matchday:3, date:"2026-06-28", time:"20:00", home:"COL", away:"KOR", homeGoals:null, awayGoals:null },
 
   // == GRUPO H ==
-  { id:43, group:"H", matchday:1, date:"2026-06-16", time:"15:00", home:"POR", away:"IRQ", homeGoals:null, awayGoals:null },
-  { id:44, group:"H", matchday:1, date:"2026-06-16", time:"18:00", home:"EGY", away:"CRC", homeGoals:null, awayGoals:null },
+  { id:43, group:"H", matchday:1, date:"2026-06-16", time:"15:00", home:"POR", away:"ALB", homeGoals:null, awayGoals:null },
+  { id:44, group:"H", matchday:1, date:"2026-06-16", time:"18:00", home:"EGY", away:"QAT", homeGoals:null, awayGoals:null },
   { id:45, group:"H", matchday:2, date:"2026-06-22", time:"15:00", home:"POR", away:"EGY", homeGoals:null, awayGoals:null },
-  { id:46, group:"H", matchday:2, date:"2026-06-22", time:"18:00", home:"CRC", away:"IRQ", homeGoals:null, awayGoals:null },
-  { id:47, group:"H", matchday:3, date:"2026-07-01", time:"20:00", home:"POR", away:"CRC", homeGoals:null, awayGoals:null },
-  { id:48, group:"H", matchday:3, date:"2026-07-01", time:"20:00", home:"EGY", away:"IRQ", homeGoals:null, awayGoals:null },
+  { id:46, group:"H", matchday:2, date:"2026-06-22", time:"18:00", home:"QAT", away:"ALB", homeGoals:null, awayGoals:null },
+  { id:47, group:"H", matchday:3, date:"2026-07-01", time:"20:00", home:"POR", away:"QAT", homeGoals:null, awayGoals:null },
+  { id:48, group:"H", matchday:3, date:"2026-07-01", time:"20:00", home:"EGY", away:"ALB", homeGoals:null, awayGoals:null },
 
   // == GRUPO I ==
   { id:49, group:"I", matchday:1, date:"2026-06-16", time:"21:00", home:"NED", away:"UZB", homeGoals:null, awayGoals:null },
@@ -260,11 +260,11 @@ const FIXTURES = [
 
   // == GRUPO K ==
   { id:61, group:"K", matchday:1, date:"2026-06-18", time:"15:00", home:"SUI", away:"IDN", homeGoals:null, awayGoals:null },
-  { id:62, group:"K", matchday:1, date:"2026-06-18", time:"18:00", home:"TUR", away:"NZL", homeGoals:null, awayGoals:null },
+  { id:62, group:"K", matchday:1, date:"2026-06-18", time:"18:00", home:"TUR", away:"SCO", homeGoals:null, awayGoals:null },
   { id:63, group:"K", matchday:2, date:"2026-06-24", time:"15:00", home:"SUI", away:"TUR", homeGoals:null, awayGoals:null },
-  { id:64, group:"K", matchday:2, date:"2026-06-24", time:"18:00", home:"IDN", away:"NZL", homeGoals:null, awayGoals:null },
+  { id:64, group:"K", matchday:2, date:"2026-06-24", time:"18:00", home:"SCO", away:"NZL", homeGoals:null, awayGoals:null },
   { id:65, group:"K", matchday:3, date:"2026-07-03", time:"20:00", home:"SUI", away:"NZL", homeGoals:null, awayGoals:null },
-  { id:66, group:"K", matchday:3, date:"2026-07-03", time:"20:00", home:"TUR", away:"IDN", homeGoals:null, awayGoals:null },
+  { id:66, group:"K", matchday:3, date:"2026-07-03", time:"20:00", home:"TUR", away:"NZL", homeGoals:null, awayGoals:null },
 
   // == GRUPO L ==
   { id:67, group:"L", matchday:1, date:"2026-06-18", time:"21:00", home:"AUT", away:"HUN", homeGoals:null, awayGoals:null },
@@ -311,20 +311,20 @@ const DORADOBET_ODDS = {
   HUN: { odds:175.00, impliedProb: 0.57  },
   CIV: { odds:200.00, impliedProb: 0.50  },
   VEN: { odds:200.00, impliedProb: 0.50  },
-  IRQ: { odds:250.00, impliedProb: 0.40  },
   UZB: { odds:250.00, impliedProb: 0.40  },
+  BEL: { odds:260.00, impliedProb: 0.38  },
   KSA: { odds:300.00, impliedProb: 0.33  },
-  CRC: { odds:300.00, impliedProb: 0.33  },
   RSA: { odds:350.00, impliedProb: 0.29  },
   JOR: { odds:400.00, impliedProb: 0.25  },
   TUN: { odds:400.00, impliedProb: 0.25  },
-  GEO: { odds:450.00, impliedProb: 0.22  },
   HON: { odds:500.00, impliedProb: 0.20  },
-  MLI: { odds:500.00, impliedProb: 0.20  },
   PAN: { odds:500.00, impliedProb: 0.20  },
+  ALB: { odds:550.00, impliedProb: 0.18  },
   COD: { odds:600.00, impliedProb: 0.17  },
   NZL: { odds:700.00, impliedProb: 0.14  },
-  IDN: { odds:750.00, impliedProb: 0.13  },
+  QAT: { odds:750.00, impliedProb: 0.13  },
+  JAM: { odds:800.00, impliedProb: 0.13  },
+  SCO: { odds:850.00, impliedProb: 0.12  },
 };
 
 const GROUPS = ["A","B","C","D","E","F","G","H","I","J","K","L"];

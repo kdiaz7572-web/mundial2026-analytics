@@ -97,7 +97,7 @@ function clearResult(fixtureId) {
  * Guarda una apuesta en el historial.
  * Acepta dos firmas:
  *   saveBet(shortName, algoProb, odds)          — legado (ganador torneo)
- *   saveBet({ team, flag, market, ... })        — extendido (picks Modelo Pro)
+ *   saveBet({ team, flag, market, ... })        — extendido (picks IA-Zak)
  */
 function saveBet(shortNameOrData, legacyAlgoProb, legacyOdds) {
   let betData;
@@ -1051,7 +1051,7 @@ function renderPredictions() {
 
 // ——— ASISTENTE DE APUESTAS ———
 function renderBetting() {
-  // ── Obtener picks del Modelo Pro (fuente primaria) ────────────
+  // ── Obtener picks del IA-Zak (fuente primaria) ────────────
   const VALUE_EDGE = 0.012;   // Regla: edge ≥ 1.2 pp para activar la alerta
   const allPicks   = AppState.getPicks();
   const valuePicks = allPicks
@@ -1146,7 +1146,7 @@ function renderBetting() {
         <div class="flex items-center gap-3 flex-wrap">
           <h3 class="text-sm font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-2">
             <span class="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-            ⚡ ${totalPicks} Oportunidad${totalPicks !== 1 ? 'es' : ''} de Valor Detectada${totalPicks !== 1 ? 's' : ''} — Modelo PRO
+            ⚡ ${totalPicks} Oportunidad${totalPicks !== 1 ? 'es' : ''} de Valor Detectada${totalPicks !== 1 ? 's' : ''} — IA-Zak Análisis
           </h3>
           <button onclick="runDailyPicks()" id="btn-gen-picks"
             class="ml-auto text-xs text-slate-500 hover:text-slate-300 border border-slate-700 hover:border-slate-500 px-3 py-1.5 rounded-lg transition-all">
@@ -1232,12 +1232,12 @@ function renderBetting() {
                         </div>
                         <button onclick="toggleBetAccordion('${uid}')"
                           id="accordion-btn-${uid}" class="vbc-accordion-btn">
-                          <span id="accordion-icon-${uid}">▼</span>&nbsp;Análisis Pro
+                          <span id="accordion-icon-${uid}">▼</span>&nbsp;Análisis IA-Zak
                         </button>
                       </div>
                     </div>
 
-                    <!-- ─── Acordeón: Análisis Pro ─── -->
+                    <!-- ─── Acordeón: Análisis IA-Zak ─── -->
                     <div id="accordion-${uid}" class="vbc-accordion hidden">
 
                       <!-- Mercado recomendado -->
@@ -1258,7 +1258,7 @@ function renderBetting() {
                       <div class="flex items-start gap-3 mb-4">
                         <span class="text-2xl mt-0.5">🤖</span>
                         <div class="flex-1 min-w-0">
-                          <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Justificación del Modelo PRO</p>
+                          <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Justificación del IA-Zak Análisis</p>
                           ${(() => {
                             // Separar el texto en oraciones para renderizar como líneas visuales
                             const lines = (pick.justification || '—').split('. ').filter(l => l.trim());
@@ -1325,7 +1325,8 @@ function renderBetting() {
                               type="number"
                               id="stake-${uid}"
                               class="calc-input"
-                              placeholder="5.000"
+                              placeholder="0"
+                              value="0"
                               min="0"
                               step="500"
                               data-odds="${pick.odds}"
@@ -1377,7 +1378,7 @@ function renderBetting() {
         <div class="card p-10 text-center">
           <p class="text-5xl mb-4">🔍</p>
           <p class="font-semibold text-slate-300 text-lg">No hay value bets con edge ≥ 1.2% en este momento</p>
-          <p class="text-sm text-slate-500 mt-2">El Modelo PRO analiza mercados específicos (goles, córners, tarjetas, 1X2)<br>usando distribución de Poisson + perfiles de árbitros en tiempo real.</p>
+          <p class="text-sm text-slate-500 mt-2">El IA-Zak Análisis analiza mercados específicos (goles, córners, tarjetas, 1X2)<br>usando distribución de Poisson + perfiles de árbitros en tiempo real.</p>
           <button onclick="runDailyPicks()" id="btn-gen-picks"
             class="mt-5 bg-amber-500 hover:bg-amber-400 text-black font-bold px-6 py-2.5 rounded-xl text-sm transition-colors">
             🤖 Generar Análisis PRO ahora
@@ -1406,7 +1407,7 @@ function renderBetting() {
 // ──────────────────────────────────────────────────────────────
 
 /**
- * Toggle del acordeón de Análisis Pro.
+ * Toggle del acordeón de Análisis IA-Zak.
  */
 function toggleBetAccordion(uid) {
   const panel = document.getElementById(`accordion-${uid}`);
@@ -1506,7 +1507,7 @@ function renderHistory() {
       <div class="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h2 class="section-title">📋 Historial de Apuestas Simuladas</h2>
-          <p class="section-subtitle">Registro detallado de oportunidades guardadas — Análisis del Modelo PRO</p>
+          <p class="section-subtitle">Registro detallado de oportunidades guardadas — Análisis del IA-Zak Análisis</p>
         </div>
         ${bets.length > 0 ? `
           <button onclick="if(confirm('¿Borrar todo el historial?')){STATE.bettingHistory=[];localStorage.removeItem('mundial2026_bets');renderHistory();}"
@@ -1712,7 +1713,7 @@ function renderModeloPro() {
 
     <!-- Título -->
     <div>
-      <h2 class="section-title">⚡ Modelo Pro + DoradoBet</h2>
+      <h2 class="section-title">⚡ IA-Zak + DoradoBet</h2>
       <p class="section-subtitle">Poisson · Dixon-Coles · Árbitros dinámicos · Cuotas en vivo DoradoBet · Detector de Edge</p>
     </div>
 
@@ -2401,11 +2402,11 @@ function updateValueEdge(marketId, modelProb, oddsStr) {
 }
 
 // ============================================================
-//  PICKS ENGINE — UI / Sección de Recomendaciones del Modelo PRO
+//  PICKS ENGINE — UI / Sección de Recomendaciones del IA-Zak Análisis
 // ============================================================
 
 /**
- * Genera el HTML de la sección "Recomendaciones del Modelo PRO"
+ * Genera el HTML de la sección "Recomendaciones del IA-Zak Análisis"
  * para el dashboard. Lee desde AppState.getPicks().
  */
 function _renderPicksSectionHTML() {
@@ -2415,7 +2416,7 @@ function _renderPicksSectionHTML() {
   <div class="card p-5">
     <div class="flex items-center justify-between mb-4">
       <h3 class="text-sm font-bold text-slate-300 uppercase tracking-wider">
-        🤖 Recomendaciones del Modelo PRO
+        🤖 Recomendaciones del IA-Zak Análisis
       </h3>
       <div class="flex items-center gap-2">
         <span id="picks-status-badge" class="text-xs text-slate-500"></span>
