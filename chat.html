@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>IA-Zak v3.0 - Chat</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f9f9f9;
+    }
+
+    .chat-wrapper {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      background: #f9f9f9;
+    }
+
+    .chat-header {
+      padding: 16px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+
+    .chat-header h2 {
+      margin: 0;
+      font-size: 20px;
+    }
+
+    #language-selector {
+      padding: 8px 12px;
+      border-radius: 6px;
+      border: none;
+      background: white;
+      color: #333;
+      cursor: pointer;
+      font-weight: 500;
+    }
+
+    .chat-status-bar {
+      padding: 12px 16px;
+      background: #f0f0f0;
+      display: flex;
+      gap: 24px;
+      font-size: 14px;
+      border-bottom: 1px solid #ddd;
+      flex-wrap: wrap;
+    }
+
+    .status-item {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .status-item input {
+      width: 100px;
+      padding: 4px 8px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      font-size: 13px;
+    }
+
+    .status-item span {
+      font-weight: bold;
+    }
+
+    #message-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .message {
+      padding: 12px 16px;
+      border-radius: 8px;
+      word-wrap: break-word;
+      line-height: 1.5;
+      animation: slideIn 0.3s ease-out;
+    }
+
+    .message-user {
+      background: #e3f2fd;
+      border-left: 4px solid #667eea;
+      align-self: flex-end;
+      max-width: 70%;
+    }
+
+    .message-assistant {
+      background: #f5f5f5;
+      border-left: 4px solid #764ba2;
+      align-self: flex-start;
+      max-width: 80%;
+    }
+
+    .message-system {
+      background: #fff3cd;
+      border-left: 4px solid #ff9800;
+      color: #856404;
+    }
+
+    .message-error {
+      background: #ffebee;
+      border-left: 4px solid #f44336;
+      color: #c62828;
+    }
+
+    @keyframes slideIn {
+      from {
+        opacity: 0;
+        transform: translateY(8px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .chat-input-area {
+      padding: 16px;
+      background: white;
+      border-top: 1px solid #ddd;
+      display: flex;
+      gap: 8px;
+    }
+
+    #chat-input {
+      flex: 1;
+      padding: 12px;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      font-size: 14px;
+      font-family: inherit;
+    }
+
+    #chat-input:focus {
+      outline: none;
+      border-color: #667eea;
+      box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+
+    #send-button {
+      padding: 12px 24px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-weight: 600;
+      cursor: pointer;
+      min-width: 100px;
+      transition: opacity 0.2s;
+    }
+
+    #send-button:hover {
+      opacity: 0.9;
+    }
+
+    #send-button:active {
+      transform: scale(0.98);
+    }
+
+    #send-button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    #typing-indicator {
+      padding: 12px 16px;
+      color: #999;
+      font-size: 13px;
+      display: none;
+    }
+
+    strong {
+      font-weight: 600;
+    }
+
+    code {
+      background: rgba(0,0,0,0.05);
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-family: monospace;
+    }
+
+    @media (max-width: 768px) {
+      .chat-status-bar {
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      #send-button {
+        min-width: 80px;
+        padding: 8px 16px;
+      }
+
+      .message-user {
+        max-width: 85%;
+      }
+
+      .message-assistant {
+        max-width: 95%;
+      }
+    }
+  </style>
+</head>
+<body>
+
+<div class="chat-wrapper">
+
+  <!-- Header with language selector -->
+  <div class="chat-header">
+    <h2>🤖 IA-Zak v3.0</h2>
+    <select id="language-selector">
+      <option value="es">Español</option>
+      <option value="en">English</option>
+    </select>
+  </div>
+
+  <!-- Status Bar -->
+  <div class="chat-status-bar">
+    <div class="status-item">
+      <span>Bankroll:</span>
+      <input type="number" id="bankroll-input" placeholder="€5000">
+    </div>
+    <div class="status-item">
+      <span id="win-rate-display">Win rate: —</span>
+    </div>
+    <div class="status-item">
+      <span id="recent-bets-display">Últimas apuestas: —</span>
+    </div>
+  </div>
+
+  <!-- Messages Container -->
+  <div id="message-list"></div>
+
+  <!-- Input Area -->
+  <div class="chat-input-area">
+    <input
+      type="text"
+      id="chat-input"
+      placeholder="Pregunta sobre cualquier partido..."
+    >
+    <button id="send-button">Enviar</button>
+  </div>
+
+  <!-- Typing Indicator -->
+  <div id="typing-indicator">
+    <span>✏️ IA-Zak está escribiendo<span class="typing-dots">.</span></span>
+  </div>
+
+</div>
+
+<script type="module">
+  // Simple chat implementation
+  class ChatApp {
+    constructor() {
+      this.messageList = document.getElementById('message-list');
+      this.inputBox = document.getElementById('chat-input');
+      this.sendButton = document.getElementById('send-button');
+      this.typingIndicator = document.getElementById('typing-indicator');
+      this.languageSelector = document.getElementById('language-selector');
+      this.bankrollInput = document.getElementById('bankroll-input');
+
+      this.sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      this.language = 'es';
+      this.bankroll = null;
+      this.isLoading = false;
+
+      this.attachEventListeners();
+      this.addSystemMessage('🤖 IA-Zak v3.0 inicializado. ¿Sobre qué partido quieres analizar?');
+    }
+
+    attachEventListeners() {
+      this.sendButton.addEventListener('click', () => this.sendMessage());
+      this.inputBox.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          this.sendMessage();
+        }
+      });
+
+      this.languageSelector.addEventListener('change', (e) => {
+        this.language = e.target.value;
+        this.addSystemMessage(
+          this.language === 'es'
+            ? '🌐 Idioma cambiado a Español'
+            : '🌐 Language changed to English'
+        );
+      });
+
+      this.bankrollInput.addEventListener('change', () => {
+        this.bankroll = parseFloat(this.bankrollInput.value) || null;
+        if (this.bankroll) {
+          this.addSystemMessage(
+            this.language === 'es'
+              ? `💰 Bankroll establecido: €${this.bankroll}`
+              : `💰 Bankroll set: €${this.bankroll}`
+          );
+        }
+      });
+    }
+
+    async sendMessage() {
+      const message = this.inputBox.value.trim();
+      if (!message) return;
+
+      if (!this.bankroll) {
+        this.addSystemMessage(
+          this.language === 'es'
+            ? '⚠️ Por favor, establece tu bankroll primero'
+            : '⚠️ Please set your bankroll first'
+        );
+        return;
+      }
+
+      this.addMessage(message, 'user');
+      this.inputBox.value = '';
+      this.sendButton.disabled = true;
+      this.isLoading = true;
+      this.showTypingIndicator();
+
+      try {
+        const response = await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            message,
+            session_id: this.sessionId,
+            language: this.language,
+            bankroll: this.bankroll
+          })
+        });
+
+        if (!response.ok) {
+          throw new Error(`API error: ${response.status}`);
+        }
+
+        const data = await response.json();
+
+        // Add IA-Zak response
+        this.addMessage(data.response || 'Sin respuesta', 'assistant');
+
+        // Show tool calls if any
+        if (data.tool_calls && data.tool_calls.length > 0) {
+          this.showToolCalls(data.tool_calls);
+        }
+
+        // Show recommendations
+        if (data.recommendations && data.recommendations.length > 0) {
+          this.showRecommendations(data.recommendations);
+        }
+
+        // Show bankroll impact warning
+        if (data.bankroll_impact && data.bankroll_impact > 0.05) {
+          this.addSystemMessage(
+            this.language === 'es'
+              ? `⚠️ Esta apuesta es el ${(data.bankroll_impact * 100).toFixed(1)}% de tu bankroll`
+              : `⚠️ This bet is ${(data.bankroll_impact * 100).toFixed(1)}% of your bankroll`
+          );
+        }
+
+      } catch (error) {
+        this.addMessage(`❌ Error: ${error.message}`, 'error');
+      } finally {
+        this.isLoading = false;
+        this.hideTypingIndicator();
+        this.sendButton.disabled = false;
+        this.inputBox.focus();
+      }
+    }
+
+    addMessage(text, type = 'assistant') {
+      const messageEl = document.createElement('div');
+      messageEl.className = `message message-${type}`;
+
+      // Parse markdown-like formatting
+      let htmlText = text
+        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\*(.*?)\*/g, '<em>$1</em>')
+        .replace(/`(.*?)`/g, '<code>$1</code>')
+        .replace(/\n/g, '<br>');
+
+      messageEl.innerHTML = htmlText;
+      this.messageList.appendChild(messageEl);
+      this.scrollToBottom();
+    }
+
+    addSystemMessage(text) {
+      this.addMessage(text, 'system');
+    }
+
+    showToolCalls(toolCalls) {
+      const toolsEl = document.createElement('div');
+      toolsEl.style.cssText = `
+        padding: 12px 16px;
+        background: #f5f5f5;
+        border-left: 4px solid #ff9800;
+        border-radius: 8px;
+        margin-top: 8px;
+        font-size: 13px;
+        color: #666;
+      `;
+
+      let toolsHtml = '<strong>🔧 Herramientas ejecutadas:</strong><br>';
+      toolCalls.forEach(tool => {
+        const status = tool.error ? '❌' : '✅';
+        toolsHtml += `${status} ${tool.name}<br>`;
+      });
+
+      toolsEl.innerHTML = toolsHtml;
+      this.messageList.appendChild(toolsEl);
+      this.scrollToBottom();
+    }
+
+    showRecommendations(recommendations) {
+      const recEl = document.createElement('div');
+      recEl.style.cssText = `
+        padding: 12px 16px;
+        background: #e8f5e9;
+        border-left: 4px solid #4caf50;
+        border-radius: 8px;
+        margin-top: 8px;
+        font-size: 13px;
+        color: #2e7d32;
+      `;
+
+      let recHtml = '<strong>💡 Recomendaciones:</strong><ul style="margin: 8px 0; padding-left: 20px;">';
+      recommendations.forEach(rec => {
+        recHtml += `<li>${rec}</li>`;
+      });
+      recHtml += '</ul>';
+
+      recEl.innerHTML = recHtml;
+      this.messageList.appendChild(recEl);
+      this.scrollToBottom();
+    }
+
+    showTypingIndicator() {
+      this.typingIndicator.style.display = 'block';
+    }
+
+    hideTypingIndicator() {
+      this.typingIndicator.style.display = 'none';
+    }
+
+    scrollToBottom() {
+      this.messageList.scrollTop = this.messageList.scrollHeight;
+    }
+  }
+
+  // Animate typing dots
+  setInterval(() => {
+    const dots = document.querySelector('.typing-dots');
+    if (dots) {
+      const current = dots.textContent;
+      dots.textContent = current === '.' ? '..' : current === '..' ? '...' : '.';
+    }
+  }, 500);
+
+  // Initialize app
+  new ChatApp();
+</script>
+
+</body>
+</html>
