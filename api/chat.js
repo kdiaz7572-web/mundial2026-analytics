@@ -143,7 +143,7 @@ export default async function handler(req, res) {
     let groqResponse;
     try {
       groqResponse = await groq.chat.completions.create({
-        model: 'mixtral-8x7b-32768', // Fast, free model
+        model: 'llama-3.1-70b-versatile', // Active Groq model
         messages: [
           { role: 'system', content: systemPrompt },
           ...messages
