@@ -9,7 +9,7 @@
   },
   "dependencies": {
     "@neondatabase/serverless": "^0.10.4",
-    "groq-sdk": "^0.4.1"
+    "groq-sdk": "^1.2.0"
   },
   "scripts": {
     "dev": "vercel dev",
