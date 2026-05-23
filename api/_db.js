@@ -155,4 +155,54 @@ async function migrate(sql) {
       updated_at   TIMESTAMPTZ DEFAULT NOW()
     )
   `;
+
+  // ── Conversation history — chat session memory ───────
+  await sql`
+    CREATE TABLE IF NOT EXISTS conversation_history (
+      id                 SERIAL PRIMARY KEY,
+      session_id         TEXT        NOT NULL,
+      user_id            TEXT,
+      user_message       TEXT        NOT NULL,
+      zak_response       TEXT,
+      function_calls_json JSONB,
+      user_bankroll      NUMERIC(12,2),
+      created_at         TIMESTAMPTZ DEFAULT NOW()
+    )
+  `;
+  await sql`CREATE INDEX IF NOT EXISTS idx_conversation_session ON conversation_history(session_id, created_at)`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_conversation_user ON conversation_history(user_id, created_at)`;
+
+  // ── Bet outcomes — user feedback on bets ────────────
+  await sql`
+    CREATE TABLE IF NOT EXISTS bet_outcomes (
+      id                      SERIAL PRIMARY KEY,
+      conversation_id         INTEGER,
+      bet_id                  INTEGER REFERENCES bets(id),
+      user_reported_outcome   TEXT CHECK (user_reported_outcome IN ('won','lost','pending','skipped')),
+      actual_result           TEXT CHECK (actual_result IN ('won','lost','pending')),
+      verified_at             TIMESTAMPTZ,
+      created_at              TIMESTAMPTZ DEFAULT NOW()
+    )
+  `;
+  await sql`CREATE INDEX IF NOT EXISTS idx_bet_outcomes_bet ON bet_outcomes(bet_id, created_at)`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_bet_outcomes_reported ON bet_outcomes(user_reported_outcome, created_at)`;
+
+  // ── Prediction accuracy tracking ────────────────────
+  await sql`
+    CREATE TABLE IF NOT EXISTS prediction_accuracy (
+      id               SERIAL PRIMARY KEY,
+      match_id         TEXT,
+      market           TEXT        NOT NULL,
+      model_prob       NUMERIC(5,4) NOT NULL,
+      predicted_outcome TEXT,
+      actual_outcome   TEXT,
+      confidence_stars INTEGER CHECK (confidence_stars >= 1 AND confidence_stars <= 5),
+      edge_calc        NUMERIC(6,3),
+      created_at       TIMESTAMPTZ DEFAULT NOW(),
+      outcome_verified_at TIMESTAMPTZ
+    )
+  `;
+  await sql`CREATE INDEX IF NOT EXISTS idx_prediction_match ON prediction_accuracy(match_id, market)`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_prediction_created ON prediction_accuracy(created_at)`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_prediction_confidence ON prediction_accuracy(confidence_stars)`;
 }
