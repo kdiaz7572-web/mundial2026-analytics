@@ -237,6 +237,24 @@ async function migrate(sql) {
   await sql`CREATE INDEX IF NOT EXISTS idx_conversation_session ON conversation_history(session_id, created_at)`;
   await sql`CREATE INDEX IF NOT EXISTS idx_conversation_user ON conversation_history(user_id, created_at)`;
 
+  // ── Bets — simple bets tracking table ──────────────────
+  await sql`
+    CREATE TABLE IF NOT EXISTS bets (
+      id              SERIAL PRIMARY KEY,
+      session_id      TEXT        NOT NULL,
+      match_id        TEXT        NOT NULL,
+      market          TEXT        NOT NULL,
+      odds            NUMERIC(6,3) NOT NULL,
+      probability     NUMERIC(5,4) NOT NULL,
+      kelly_bet_size  NUMERIC(10,2),
+      bankroll_used   NUMERIC(10,2),
+      status          TEXT DEFAULT 'pending',
+      created_at      TIMESTAMPTZ DEFAULT NOW()
+    )
+  `;
+  await sql`CREATE INDEX IF NOT EXISTS idx_bets_session ON bets(session_id, created_at)`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_bets_match ON bets(match_id, created_at)`;
+
   // ── Bet outcomes — user feedback on bets ────────────
   await sql`
     CREATE TABLE IF NOT EXISTS bet_outcomes (

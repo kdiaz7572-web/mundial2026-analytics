@@ -182,22 +182,24 @@ export default async function handler(req, res) {
     // =====================================================
     let userContext = '';
     if (bankroll) {
-      const [accuracy] = await db`
-        SELECT
-          COUNT(*) as total_bets,
-          SUM(CASE WHEN actual_outcome = predicted_outcome THEN 1 ELSE 0 END) as wins
-        FROM prediction_accuracy
-        WHERE created_at > NOW() - INTERVAL '30 days'
-        LIMIT 1
-      `;
+      try {
+        const accuracy = await db`
+          SELECT COUNT(*) as total_predictions
+          FROM prediction_accuracy
+          WHERE outcome_verified_at > NOW() - INTERVAL '30 days'
+        `;
 
-      const winRate = accuracy.total_bets > 0
-        ? Math.round((accuracy.wins / accuracy.total_bets) * 100)
-        : 0;
+        const totalPredictions = accuracy && accuracy[0] ? accuracy[0].total_predictions : 0;
+        const winRate = totalPredictions > 0 ? 'pending' : 'no data';
 
-      userContext = `- Bankroll: ${bankroll}€ (manage conservatively)
-- Win rate (last 30 days): ${winRate}%
-- Previous bets: ${accuracy.total_bets || 0} tracked`;
+        userContext = `- Bankroll: ${bankroll}€ (manage conservatively)
+- Predictions tracked (last 30 days): ${totalPredictions}
+- Learning system active`;
+      } catch (e) {
+        console.warn('[chat] Could not fetch accuracy stats:', e.message);
+        userContext = `- Bankroll: ${bankroll}€ (manage conservatively)
+- Learning system active (accuracy stats unavailable)`;
+      }
     } else {
       userContext = '- Bankroll: Not set (ask user to confirm before recommending bets)';
     }
