@@ -3,8 +3,7 @@
   "crons": [
     {
       "path": "/api/learn",
-      "schedule": "0 6 * * *",
-      "description": "Daily 06:00 UTC - All data syncs + research"
+      "schedule": "0 6 * * *"
     }
   ]
 }
