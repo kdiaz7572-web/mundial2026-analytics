@@ -25,21 +25,77 @@ export async function getDb() {
 }
 
 async function migrate(sql) {
-  // ── Bets — user betting history (CORRECTED SCHEMA) ──────────────────────────────
-  // NOTE: Removed old incomplete bets definition. Using correct schema below.
-  // Old schema lacked: session_id, match_id, kelly_bet_size, probability, bankroll_used
-
-  // ── Fixture results ─────────────────────────────────────
+  // ── Conversation history — chat session memory ───────
   await sql`
-    CREATE TABLE IF NOT EXISTS fixture_results (
-      id          SERIAL PRIMARY KEY,
-      fixture_id  TEXT        NOT NULL,
-      home        TEXT        NOT NULL,
-      away        TEXT        NOT NULL,
-      home_goals  INTEGER,
-      away_goals  INTEGER,
-      group_name  TEXT,
-      played_at   TIMESTAMPTZ DEFAULT NOW()
+    CREATE TABLE IF NOT EXISTS conversation_history (
+      id                 SERIAL PRIMARY KEY,
+      session_id         TEXT        NOT NULL,
+      user_id            TEXT,
+      user_message       TEXT        NOT NULL,
+      zak_response       TEXT,
+      function_calls_json JSONB,
+      user_bankroll      NUMERIC(12,2),
+      created_at         TIMESTAMPTZ DEFAULT NOW()
+    )
+  `;
+
+  // ── Bets — simple bets tracking table ──────────────────
+  await sql`
+    CREATE TABLE IF NOT EXISTS bets (
+      id              SERIAL PRIMARY KEY,
+      session_id      TEXT        NOT NULL,
+      match_id        TEXT        NOT NULL,
+      market          TEXT        NOT NULL,
+      odds            NUMERIC(6,3) NOT NULL,
+      probability     NUMERIC(5,4) NOT NULL,
+      kelly_bet_size  NUMERIC(10,2),
+      bankroll_used   NUMERIC(10,2),
+      status          TEXT DEFAULT 'pending',
+      created_at      TIMESTAMPTZ DEFAULT NOW()
+    )
+  `;
+
+  // ── Bet outcomes — user feedback on bets ────────────
+  await sql`
+    CREATE TABLE IF NOT EXISTS bet_outcomes (
+      id                      SERIAL PRIMARY KEY,
+      conversation_id         INTEGER,
+      bet_id                  INTEGER,
+      user_reported_outcome   TEXT,
+      actual_result           TEXT,
+      verified_at             TIMESTAMPTZ,
+      created_at              TIMESTAMPTZ DEFAULT NOW()
+    )
+  `;
+
+  // ── Prediction accuracy tracking ────────────────────
+  await sql`
+    CREATE TABLE IF NOT EXISTS prediction_accuracy (
+      id               SERIAL PRIMARY KEY,
+      match_id         TEXT,
+      market           TEXT        NOT NULL,
+      model_prob       NUMERIC(5,4) NOT NULL,
+      predicted_outcome TEXT,
+      actual_outcome   TEXT,
+      confidence_stars INTEGER,
+      edge_calc        NUMERIC(6,3),
+      brier_score_val  NUMERIC(6,4),
+      created_at       TIMESTAMPTZ DEFAULT NOW(),
+      outcome_verified_at TIMESTAMPTZ
+    )
+  `;
+
+  // ── Learning engine data ──────────────────────────
+  await sql`
+    CREATE TABLE IF NOT EXISTS learning_data (
+      id           SERIAL PRIMARY KEY,
+      market       TEXT        NOT NULL,
+      predicted    NUMERIC(5,3),
+      actual       BOOLEAN,
+      edge         NUMERIC(6,3),
+      odds         NUMERIC(6,2),
+      fixture_id   TEXT,
+      created_at   TIMESTAMPTZ DEFAULT NOW()
     )
   `;
 
@@ -56,17 +112,17 @@ async function migrate(sql) {
     )
   `;
 
-  // ── Learning engine data ──────────────────────────────
+  // ── Fixture results ─────────────────────────────────────
   await sql`
-    CREATE TABLE IF NOT EXISTS learning_data (
-      id           SERIAL PRIMARY KEY,
-      market       TEXT        NOT NULL,
-      predicted    NUMERIC(5,3),
-      actual       BOOLEAN,
-      edge         NUMERIC(6,3),
-      odds         NUMERIC(6,2),
-      fixture_id   TEXT,
-      created_at   TIMESTAMPTZ DEFAULT NOW()
+    CREATE TABLE IF NOT EXISTS fixture_results (
+      id          SERIAL PRIMARY KEY,
+      fixture_id  TEXT        NOT NULL,
+      home        TEXT        NOT NULL,
+      away        TEXT        NOT NULL,
+      home_goals  INTEGER,
+      away_goals  INTEGER,
+      group_name  TEXT,
+      played_at   TIMESTAMPTZ DEFAULT NOW()
     )
   `;
 
@@ -199,72 +255,19 @@ async function migrate(sql) {
     )
   `;
 
-  // ── Conversation history — chat session memory ───────
-  await sql`
-    CREATE TABLE IF NOT EXISTS conversation_history (
-      id                 SERIAL PRIMARY KEY,
-      session_id         TEXT        NOT NULL,
-      user_id            TEXT,
-      user_message       TEXT        NOT NULL,
-      zak_response       TEXT,
-      function_calls_json JSONB,
-      user_bankroll      NUMERIC(12,2),
-      created_at         TIMESTAMPTZ DEFAULT NOW()
-    )
-  `;
-  await sql`CREATE INDEX IF NOT EXISTS idx_conversation_session ON conversation_history(session_id, created_at)`;
-  await sql`CREATE INDEX IF NOT EXISTS idx_conversation_user ON conversation_history(user_id, created_at)`;
+  // Create indexes
+  try {
+    await sql`CREATE INDEX IF NOT EXISTS idx_conversation_session ON conversation_history(session_id, created_at)`;
+    await sql`CREATE INDEX IF NOT EXISTS idx_conversation_user ON conversation_history(user_id, created_at)`;
+    await sql`CREATE INDEX IF NOT EXISTS idx_bets_session ON bets(session_id, created_at)`;
+    await sql`CREATE INDEX IF NOT EXISTS idx_bets_match ON bets(match_id, created_at)`;
+    await sql`CREATE INDEX IF NOT EXISTS idx_bet_outcomes_bet ON bet_outcomes(bet_id, created_at)`;
+    await sql`CREATE INDEX IF NOT EXISTS idx_prediction_match ON prediction_accuracy(match_id, market)`;
+    await sql`CREATE INDEX IF NOT EXISTS idx_prediction_created ON prediction_accuracy(created_at)`;
+    await sql`CREATE INDEX IF NOT EXISTS idx_prediction_confidence ON prediction_accuracy(confidence_stars)`;
+  } catch (e) {
+    console.warn('[migrate] Index creation warning:', e.message);
+  }
 
-  // ── Bets — simple bets tracking table ──────────────────
-  await sql`
-    CREATE TABLE IF NOT EXISTS bets (
-      id              SERIAL PRIMARY KEY,
-      session_id      TEXT        NOT NULL,
-      match_id        TEXT        NOT NULL,
-      market          TEXT        NOT NULL,
-      odds            NUMERIC(6,3) NOT NULL,
-      probability     NUMERIC(5,4) NOT NULL,
-      kelly_bet_size  NUMERIC(10,2),
-      bankroll_used   NUMERIC(10,2),
-      status          TEXT DEFAULT 'pending',
-      created_at      TIMESTAMPTZ DEFAULT NOW()
-    )
-  `;
-  await sql`CREATE INDEX IF NOT EXISTS idx_bets_session ON bets(session_id, created_at)`;
-  await sql`CREATE INDEX IF NOT EXISTS idx_bets_match ON bets(match_id, created_at)`;
-
-  // ── Bet outcomes — user feedback on bets ────────────
-  await sql`
-    CREATE TABLE IF NOT EXISTS bet_outcomes (
-      id                      SERIAL PRIMARY KEY,
-      conversation_id         INTEGER,
-      bet_id                  INTEGER ,
-      user_reported_outcome   TEXT ,
-      actual_result           TEXT ,
-      verified_at             TIMESTAMPTZ,
-      created_at              TIMESTAMPTZ DEFAULT NOW()
-    )
-  `;
-  await sql`CREATE INDEX IF NOT EXISTS idx_bet_outcomes_bet ON bet_outcomes(bet_id, created_at)`;
-  await sql`CREATE INDEX IF NOT EXISTS idx_bet_outcomes_reported ON bet_outcomes(user_reported_outcome, created_at)`;
-
-  // ── Prediction accuracy tracking ────────────────────
-  await sql`
-    CREATE TABLE IF NOT EXISTS prediction_accuracy (
-      id               SERIAL PRIMARY KEY,
-      match_id         TEXT,
-      market           TEXT        NOT NULL,
-      model_prob       NUMERIC(5,4) NOT NULL,
-      predicted_outcome TEXT,
-      actual_outcome   TEXT,
-      confidence_stars INTEGER ,
-      edge_calc        NUMERIC(6,3),
-      brier_score_val  NUMERIC(6,4),
-      created_at       TIMESTAMPTZ DEFAULT NOW(),
-      outcome_verified_at TIMESTAMPTZ
-    )
-  `;
-  await sql`CREATE INDEX IF NOT EXISTS idx_prediction_match ON prediction_accuracy(match_id, market)`;
-  await sql`CREATE INDEX IF NOT EXISTS idx_prediction_created ON prediction_accuracy(created_at)`;
-  await sql`CREATE INDEX IF NOT EXISTS idx_prediction_confidence ON prediction_accuracy(confidence_stars)`;
+  console.log('[migrate] ✅ Database migration complete');
 }
