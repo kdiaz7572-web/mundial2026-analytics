@@ -69,7 +69,7 @@ async function migrate(sql) {
       picks_json  JSONB       NOT NULL,
       lambda_home NUMERIC(4,2),
       lambda_away NUMERIC(4,2),
-      created_at  TIMESTAMPTZ DEFAULT NOW(),
+      created_at  TIMESTAMPTZ DEFAULT NOW()
     )
   `;
 
@@ -110,7 +110,7 @@ async function migrate(sql) {
       xg_per_game     NUMERIC(5,3),
       raw_json        JSONB,
       source          TEXT        DEFAULT 'api-football',
-      fetched_at      TIMESTAMPTZ DEFAULT NOW(),
+      fetched_at      TIMESTAMPTZ DEFAULT NOW()
     )
   `;
 
@@ -173,8 +173,7 @@ async function migrate(sql) {
       impact_on_team   NUMERIC(3,1),
       data_source      VARCHAR(50),
       last_verified    TIMESTAMP,
-      created_at       TIMESTAMPTZ DEFAULT NOW(),
-      INDEX (player_name, team)
+      created_at       TIMESTAMPTZ DEFAULT NOW()
     )
   `;
 
@@ -196,8 +195,7 @@ async function migrate(sql) {
       reasoning_chain      JSONB,
       data_sources_used    JSONB,
       created_at           TIMESTAMPTZ DEFAULT NOW(),
-      verified_at          TIMESTAMPTZ,
-      INDEX (match_id, model_version)
+      verified_at          TIMESTAMPTZ
     )
   `;
 
@@ -214,8 +212,7 @@ async function migrate(sql) {
       final_recommendation TEXT,
       confidence_level     VARCHAR(20),
       user_bankroll        NUMERIC(12,2),
-      created_at           TIMESTAMPTZ DEFAULT NOW(),
-      INDEX (conversation_id, created_at)
+      created_at           TIMESTAMPTZ DEFAULT NOW()
     )
   `;
 
