@@ -143,7 +143,7 @@ export default async function handler(req, res) {
     let groqResponse;
     try {
       groqResponse = await groq.chat.completions.create({
-        model: 'llama-3.1-70b', // Active Groq model (replaced llama-3.1-70b-versatile)
+        model: 'llama-3.3-70b-versatile', // Latest active Groq model (Llama 3.3)
         messages: [
           { role: 'system', content: systemPrompt },
           ...messages
