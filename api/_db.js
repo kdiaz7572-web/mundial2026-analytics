@@ -40,7 +40,7 @@ async function migrate(sql) {
       stake         NUMERIC(12,2) DEFAULT 0,
       total_return  NUMERIC(12,2) DEFAULT 0,
       net_profit    NUMERIC(12,2) DEFAULT 0,
-      result        TEXT        DEFAULT 'pending'  CHECK (result IN ('pending','won','lost')),
+      result        TEXT        DEFAULT 'pending'  ,
       justification TEXT,
       created_at    TIMESTAMPTZ DEFAULT NOW()
     )
@@ -260,9 +260,9 @@ async function migrate(sql) {
     CREATE TABLE IF NOT EXISTS bet_outcomes (
       id                      SERIAL PRIMARY KEY,
       conversation_id         INTEGER,
-      bet_id                  INTEGER REFERENCES bets(id),
-      user_reported_outcome   TEXT CHECK (user_reported_outcome IN ('won','lost','pending','skipped')),
-      actual_result           TEXT CHECK (actual_result IN ('won','lost','pending')),
+      bet_id                  INTEGER ,
+      user_reported_outcome   TEXT ,
+      actual_result           TEXT ,
       verified_at             TIMESTAMPTZ,
       created_at              TIMESTAMPTZ DEFAULT NOW()
     )
@@ -279,7 +279,7 @@ async function migrate(sql) {
       model_prob       NUMERIC(5,4) NOT NULL,
       predicted_outcome TEXT,
       actual_outcome   TEXT,
-      confidence_stars INTEGER CHECK (confidence_stars >= 1 AND confidence_stars <= 5),
+      confidence_stars INTEGER ,
       edge_calc        NUMERIC(6,3),
       created_at       TIMESTAMPTZ DEFAULT NOW(),
       outcome_verified_at TIMESTAMPTZ
