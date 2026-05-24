@@ -1,8 +1,10 @@
 // ============================================================
+// Rebuild trigger: 2026-05-23 20:31:03
 //  Chat Endpoint - Groq LLM Integration for IA-Zak v3.0
 //  Processes user messages, maintains conversation history,
 //  executes tools, and returns betting recommendations
 // ============================================================
+// Rebuild trigger: 2026-05-23 20:31:03
 
 import Groq from 'groq-sdk';
 import { getDb } from './_db.js';
@@ -252,3 +254,4 @@ export default async function handler(req, res) {
     });
   }
 }
+
