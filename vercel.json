@@ -1,12 +1,6 @@
 {
   "version": 2,
   "name": "mundial2026-analytics",
-  "functions": {
-    "api/**/*.js": {
-      "memory": 1024,
-      "maxDuration": 60
-    }
-  },
   "crons": [
     {
       "path": "/api/learn",
@@ -38,18 +32,5 @@
       "schedule": "45 22 * * *",
       "description": "Post-verificación (22:45 UTC) - Ajuste dinámico de pesos"
     }
-  ],
-  "headers": [
-    {
-      "source": "/api/(.*)",
-      "headers": [
-        { "key": "Access-Control-Allow-Origin",  "value": "*" },
-        { "key": "Access-Control-Allow-Methods", "value": "GET,POST,PUT,DELETE,OPTIONS" },
-        { "key": "Access-Control-Allow-Headers", "value": "Content-Type" }
-      ]
-    }
-  ],
-  "rewrites": [
-    { "source": "/api/:path*", "destination": "/api/:path*" }
   ]
 }
