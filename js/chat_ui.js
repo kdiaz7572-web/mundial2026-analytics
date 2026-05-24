@@ -122,19 +122,36 @@ const ChatUI = {
     this.setLoading(true);
 
     try {
-      const response = await fetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message,
-          session_id: this.state.session_id,
-          language: this.state.language,
-          bankroll: this.state.bankroll
-        })
-      });
+      let data;
+      try {
+        const response = await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            message,
+            session_id: this.state.session_id,
+            language: this.state.language,
+            bankroll: this.state.bankroll
+          })
+        });
 
-      if (!response.ok) throw new Error(`Error: ${response.statusText}`);
-      const data = await response.json();
+        if (!response.ok) throw new Error(`Error: ${response.statusText}`);
+        data = await response.json();
+      } catch (chatError) {
+        console.warn('[chatUI] Main chat endpoint failed, trying simple endpoint:', chatError.message);
+        // Fallback to simple chat endpoint
+        const response = await fetch('/api/chat_simple', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            message,
+            session_id: this.state.session_id,
+            language: this.state.language
+          })
+        });
+        if (!response.ok) throw new Error(`Fallback error: ${response.statusText}`);
+        data = await response.json();
+      }
 
       this.state.messages.push({
         role: 'assistant',
