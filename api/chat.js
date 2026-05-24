@@ -128,6 +128,21 @@ export default async function handler(req, res) {
     return sendError(res, 405, 'Method Not Allowed', 'Only POST requests are allowed');
   }
 
+  // Check critical dependencies FIRST
+  if (!process.env.GROQ_API_KEY) {
+    console.error('[chat] GROQ_API_KEY not configured - falling back');
+    return sendSuccess(res, {
+      response: 'IA-Zak necesita configuración. Por favor, contacta al administrador.',
+      reasoning_chain: ['Revisor de configuración', 'GROQ_API_KEY no encontrada', 'Entrando en modo fallback'],
+      recommendations: ['Configure GROQ_API_KEY en Vercel environment variables'],
+      kelly_calculations: null,
+      data_sources_used: [],
+      confidence: 'unavailable',
+      tool_calls: [],
+      fallback: true
+    }, 'Configuration required');
+  }
+
   // Validate request
   const { message, session_id, language = 'es', bankroll } = req.body;
 
