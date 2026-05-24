@@ -1,10 +1,10 @@
 // ============================================================
-// Rebuild trigger: 2026-05-23 20:31:03
+// Rebuild trigger: 2026-05-23 22:15:00
 //  Chat Endpoint - Groq LLM Integration for IA-Zak v3.0
-//  Processes user messages, maintains conversation history,
-//  executes tools, and returns betting recommendations
+//  - FerXxxa Intel Integration: Receives DoradoBet chat context
+//  - Processes user messages, maintains conversation history,
+//  - Executes tools, and returns betting recommendations
 // ============================================================
-// Rebuild trigger: 2026-05-23 20:31:03
 
 import Groq from 'groq-sdk';
 import { getDb } from './_db.js';
@@ -52,6 +52,30 @@ Paso 6: SÍNTESIS - Recomendación estructurada con citas y advertencias
 CONTEXTO DEL USUARIO:
 {USER_CONTEXT}
 
+RECOMENDACIONES DE APUESTA EN COLONES (₡):
+INSTRUCCIONES CRÍTICAS para apuestas:
+1. CANTIDAD EXACTA: Cuando recomiendes una apuesta, SIEMPRE incluye el monto EXACTO en colones (₡)
+2. FÓRMULA KELLY: Usa la fórmula Kelly Criterion: kelly_% = (edge × probability) / odds
+   - Ejemplo: Si probabilidad=68%, odds=1.80, entonces edge = (0.68×1.80)-1 = 0.224 = 22.4%
+   - kelly_% = (0.224 × 0.68) / 1.80 = 8.46% del bankroll
+3. EXPLICACIÓN DEL POR QUÉ: Justifica explícitamente:
+   - Probabilidad estimada (ej: 68% basado en [FBREF: ...]
+   - Edge calculado (ej: 22.4% porque odds undervalúan al equipo)
+   - Riesgo vs recompensa (ej: Risk of Ruin = 1.5%)
+4. TIPO DE APUESTA: Siempre especifica: "1x2" | "Over/Under" | "BTTS" | "Combinada"
+5. VALIDACIÓN BANKROLL:
+   - Si bankroll < ₡5,000: Responde "Bankroll muy bajo para cálculos precisos. Mínimo recomendado: ₡5,000"
+   - Si kelly_% > 25%: Incluye ⚠️ "Kelly alto - considera Fractional Kelly (50% o 25% del sugerido)"
+   - Máximo: Limita recomendaciones a ₡50,000 aunque Kelly sugiera más
+
+INSTRUCCIONES SOBRE FERXXXA INTEL (CONTEXTO COMUNITARIO):
+Si tienes información de FerXxxa (chat de DoradoBet), úsala para:
+1. Validar tu análisis: ¿coincide con la opinión de otros apostadores?
+2. Detectar arbitrage: ¿estás viendo algo que otros no ven?
+3. Ajustar confianza: si la mayoría apuesta diferente, reduce tu confianza o explica por qué diverges
+4. Alertas de lesiones: incorpora lesiones mencionadas en chat a tu análisis
+5. Narrativas trending: considera si el chat detecta patrones que tú no viste
+
 REGLAS CRÍTICAS:
 - Si NO tengo datos: "No tengo información sobre X. Necesitaría datos de Y para mejorar el análisis"
 - Si HAY incertidumbre: "Mi confianza es MEDIUM porque [razón específica]"
@@ -60,13 +84,27 @@ REGLAS CRÍTICAS:
 {
   "reasoning_chain": ["Paso 1: Entiendo que preguntas...", "Paso 2: Consulto datos...", "Paso 3: Conflictos encontrados:", "Paso 4: Calculo probabilidades", "Paso 5: Kelly % = X%, Risk of Ruin = Y%"],
   "analysis": "Análisis detallado citando fuentes",
-  "data_sources_used": ["FBREF", "Understat", "API-Football", "Transfermarkt"],
+  "data_sources_used": ["FBREF", "Understat", "API-Football", "Transfermarkt", "FerXxxa"],
   "uncertainties": ["Lesión de X no confirmada", "Datos Understat de 3 días"],
   "confidence": "medium|high|low con justificación",
   "recommendations": ["Pick 1: X con Y% de probabilidad", "Pick 2: ..."],
   "kelly_calculations": {
-    "bet_1": {"probability": 0.60, "odds": 1.80, "kelly_%": 12.5, "bet_size": 125},
-    "warnings": ["Risk of Ruin = 2.3%"]
+    "bet_1": {
+      "amount_colones": 5000,
+      "kelly_percentage": 12.5,
+      "bet_type": "1x2",
+      "reasoning": "Descripción de por qué es la mejor apuesta",
+      "probability": 0.68,
+      "odds": 1.80,
+      "edge": 0.224,
+      "risk_of_ruin": 1.5,
+      "ferxxxa_context": {
+        "doradobet_consensus": "Over 2.5 goles (46% de apostadores)",
+        "consensus_matches_our_pick": true,
+        "confidence_adjustment": "Sin ajuste - sentimiento positivo"
+      }
+    },
+    "warnings": ["⚠️ Kelly > 25% si aplica", "Risk of Ruin calculado"]
   }
 }`,
 
@@ -90,6 +128,30 @@ Step 6: SYNTHESIS - Structured recommendation with citations and warnings
 USER CONTEXT:
 {USER_CONTEXT}
 
+BET RECOMMENDATIONS IN COLONES (₡):
+CRITICAL INSTRUCTIONS for betting recommendations:
+1. EXACT AMOUNT: When recommending a bet, ALWAYS include the EXACT amount in Costa Rican Colones (₡)
+2. KELLY FORMULA: Use Kelly Criterion formula: kelly_% = (edge × probability) / odds
+   - Example: If probability=68%, odds=1.80, then edge = (0.68×1.80)-1 = 0.224 = 22.4%
+   - kelly_% = (0.224 × 0.68) / 1.80 = 8.46% of bankroll
+3. EXPLAIN THE WHY: Always justify explicitly:
+   - Estimated probability (e.g., 68% based on [FBREF: ...])
+   - Calculated edge (e.g., 22.4% because odds undervalue the team)
+   - Risk vs reward (e.g., Risk of Ruin = 1.5%)
+4. BET TYPE: Always specify: "1x2" | "Over/Under" | "BTTS" | "Parlay"
+5. BANKROLL VALIDATION:
+   - If bankroll < ₡5,000: Respond "Bankroll too low for precise calculations. Minimum recommended: ₡5,000"
+   - If kelly_% > 25%: Include ⚠️ "High Kelly - consider Fractional Kelly (50% or 25% of suggested)"
+   - Maximum: Cap recommendations at ₡50,000 even if Kelly suggests more
+
+INSTRUCTIONS ABOUT FERXXXA INTEL (COMMUNITY CONTEXT):
+If you have FerXxxa information (DoradoBet chat), use it to:
+1. Validate your analysis: Does it match other bettors' opinions?
+2. Detect arbitrage: Are you seeing something others miss?
+3. Adjust confidence: If majority bets differently, lower your confidence or explain divergence
+4. Include injuries: Incorporate chat-mentioned injuries into your analysis
+5. Trending narratives: Consider if chat detected patterns you didn't see
+
 CRITICAL RULES:
 - If I DON'T have data: "I don't have information on X. I would need data on Y to improve analysis"
 - If there IS uncertainty: "My confidence is MEDIUM because [specific reason]"
@@ -98,13 +160,27 @@ CRITICAL RULES:
 {
   "reasoning_chain": ["Step 1: I understand you're asking...", "Step 2: I consult data...", "Step 3: Conflicts found:", "Step 4: Calculate probabilities", "Step 5: Kelly % = X%, Risk of Ruin = Y%"],
   "analysis": "Detailed analysis citing sources",
-  "data_sources_used": ["FBREF", "Understat", "API-Football", "Transfermarkt"],
+  "data_sources_used": ["FBREF", "Understat", "API-Football", "Transfermarkt", "FerXxxa"],
   "uncertainties": ["Injury of X unconfirmed", "Understat data from 3 days ago"],
   "confidence": "medium|high|low with justification",
   "recommendations": ["Pick 1: X with Y% probability", "Pick 2: ..."],
   "kelly_calculations": {
-    "bet_1": {"probability": 0.60, "odds": 1.80, "kelly_%": 12.5, "bet_size": 125},
-    "warnings": ["Risk of Ruin = 2.3%"]
+    "bet_1": {
+      "amount_colones": 5000,
+      "kelly_percentage": 12.5,
+      "bet_type": "1x2",
+      "reasoning": "Description of why this is the best bet",
+      "probability": 0.68,
+      "odds": 1.80,
+      "edge": 0.224,
+      "risk_of_ruin": 1.5,
+      "ferxxxa_context": {
+        "doradobet_consensus": "Over 2.5 goals (46% of bettors)",
+        "consensus_matches_our_pick": true,
+        "confidence_adjustment": "No adjustment - positive sentiment"
+      }
+    },
+    "warnings": ["⚠️ High Kelly > 25% if applicable", "Calculated Risk of Ruin"]
   }
 }`
 };
@@ -112,7 +188,7 @@ CRITICAL RULES:
 /**
  * POST /api/chat
  * Request: { message: string, session_id: string, language: 'es'|'en', bankroll?: number }
- * Response: { response: string, tool_calls: array, bankroll_impact?: number, error?: string }
+ * Response: { response: string, tool_calls: array, bankroll_impact?: number, ferxxxa_intel?: object }
  */
 export default async function handler(req, res) {
   // Set CORS headers
@@ -190,7 +266,18 @@ export default async function handler(req, res) {
     // 2. Prepare system prompt with user context
     // =====================================================
     let userContext = '';
+    let bankrollValidation = { valid: true, warnings: [] };
+
     if (bankroll) {
+      // Validate bankroll in colones
+      if (bankroll < 5000) {
+        bankrollValidation.valid = false;
+        bankrollValidation.warnings.push('Bankroll < ₡5,000: Too low for precise Kelly calculations');
+      }
+      if (bankroll > 50000) {
+        bankrollValidation.warnings.push('Bankroll > ₡50,000: Cap bet recommendations at ₡50,000');
+      }
+
       try {
         const accuracy = await db`
           SELECT COUNT(*) as total_predictions
@@ -201,17 +288,83 @@ export default async function handler(req, res) {
         const totalPredictions = accuracy && accuracy[0] ? accuracy[0].total_predictions : 0;
         const winRate = totalPredictions > 0 ? 'pending' : 'no data';
 
-        userContext = `- Bankroll: ${bankroll}€ (manage conservatively)
+        userContext = `- Bankroll: ₡${bankroll.toLocaleString('es-CR')} (máximo de recomendación: ₡50,000)
 - Predictions tracked (last 30 days): ${totalPredictions}
-- Learning system active`;
+- Learning system active
+- Kelly Criterion enabled: Use kelly_% = (edge × probability) / odds`;
       } catch (e) {
         console.warn('[chat] Could not fetch accuracy stats:', e.message);
-        userContext = `- Bankroll: ${bankroll}€ (manage conservatively)
-- Learning system active (accuracy stats unavailable)`;
+        userContext = `- Bankroll: ₡${bankroll.toLocaleString('es-CR')} (máximo de recomendación: ₡50,000)
+- Learning system active (accuracy stats unavailable)
+- Kelly Criterion enabled: Use kelly_% = (edge × probability) / odds`;
       }
     } else {
-      userContext = '- Bankroll: Not set (ask user to confirm before recommending bets)';
+      userContext = '- Bankroll: Not set (ask user to confirm before recommending bets in Colones)';
     }
+
+    // =====================================================
+    // 2.1. INTEGRATION POINT: Fetch FerXxxa Intel from DoradoBet chat
+    // =====================================================
+    let ferxxxaContext = '';
+    let ferxxxaIntel = null;
+    let ferxxxaMetadata = {
+      available: false,
+      age_minutes: null,
+      data_freshness: 'unavailable'
+    };
+
+    try {
+      const ferxxxaRes = await db`
+        SELECT summary_json, studied_at FROM zak_intel
+        WHERE topic = 'ferxxxa_intel'
+        AND studied_at > NOW() - INTERVAL '4 hours'
+        ORDER BY studied_at DESC
+        LIMIT 1
+      `;
+      if (ferxxxaRes && ferxxxaRes[0]) {
+        ferxxxaIntel = ferxxxaRes[0].summary_json;
+        const studiedAt = new Date(ferxxxaRes[0].studied_at);
+        const now = new Date();
+        const ageMinutes = Math.round((now - studiedAt) / 60000);
+
+        ferxxxaMetadata.available = true;
+        ferxxxaMetadata.age_minutes = ageMinutes;
+        ferxxxaMetadata.data_freshness = ageMinutes < 60 ? 'fresh' : ageMinutes < 180 ? 'recent' : 'aging';
+
+        // Build FerXxxa context for system prompt
+        const matchPredictions = ferxxxaIntel.match_predictions || {};
+        const trendingNarratives = (ferxxxaIntel.trending_narratives || []).slice(0, 3).join(' | ');
+        const injuryAlerts = (ferxxxaIntel.injury_alerts || [])
+          .filter(a => a.status !== 'reported_fit')
+          .map(a => `${a.player} (${a.status})`)
+          .join(', ');
+
+        const sentiment = ferxxxaIntel.sentiment_analysis || {};
+        const sentimentRatio = sentiment.positive_messages && sentiment.negative_messages
+          ? `${sentiment.positive_messages}+ / ${sentiment.negative_messages}-`
+          : 'unknown';
+
+        ferxxxaContext = `
+
+FERXXXA DORADOBET CHAT INTELLIGENCE (Community Predictions):
+  • Trending narratives: ${trendingNarratives || 'No trends detected'}
+  • Community sentiment: ${sentimentRatio} messages (trend: ${sentiment.overall_sentiment || 'neutral'})
+  • Injury reports from chat: ${injuryAlerts || 'None mentioned by community'}
+  • Intel freshness: ${ageMinutes} minutes old
+  • How to use: Validate your picks against community, detect divergences, incorporate chat-mentioned injuries`;
+
+        console.log(`[chat] ✅ FerXxxa intel loaded (${ageMinutes}m old)`);
+      } else {
+        ferxxxaContext = '\n\nFERXXXA DORADOBET CHAT INTELLIGENCE: No recent data available (last update >4h old)';
+        console.log('[chat] ⚠️ FerXxxa intel unavailable - data >4h old');
+      }
+    } catch (e) {
+      console.warn('[chat] Could not fetch FerXxxa intel:', e.message);
+      ferxxxaContext = '\n\nFERXXXA DORADOBET CHAT INTELLIGENCE: Currently unavailable (check connection)';
+    }
+
+    // Append FerXxxa context to userContext
+    userContext += ferxxxaContext;
 
     const systemPrompt = (SYSTEM_PROMPTS[language] || SYSTEM_PROMPTS.es)
       .replace('{USER_CONTEXT}', userContext);
@@ -242,7 +395,8 @@ export default async function handler(req, res) {
         data_sources_used: [],
         confidence: 'low',
         tool_calls: [],
-        fallback: true
+        fallback: true,
+        ferxxxa_intel: ferxxxaMetadata
       }, 'IA-Zak fallback mode');
     }
 
@@ -333,7 +487,7 @@ export default async function handler(req, res) {
     }
 
     // =====================================================
-    // 7. Return response with all Groq output fields
+    // 7. Return response with all Groq output fields + FerXxxa metadata
     // =====================================================
     return sendSuccess(res, {
       response: groqOutput.response || groqOutput.analysis || 'No response generated',
@@ -345,7 +499,8 @@ export default async function handler(req, res) {
       confidence: groqOutput.confidence || 'medium',
       tool_calls: executedTools,
       bankroll_impact: bankrollImpact > 0 ? Math.round(bankrollImpact * 10000) / 100 : null,
-      language: language
+      language: language,
+      ferxxxa_intel: ferxxxaMetadata
     }, 'Analysis complete');
 
   } catch (error) {
@@ -355,4 +510,3 @@ export default async function handler(req, res) {
     });
   }
 }
-

@@ -3,7 +3,13 @@
   "crons": [
     {
       "path": "/api/learn",
-      "schedule": "0 6 * * *"
+      "schedule": "0 6 * * *",
+      "description": "Daily learning cycle - validates predictions"
+    },
+    {
+      "path": "/api/ferxxxa-intel",
+      "schedule": "0 */3 * * *",
+      "description": "FerXxxa DoradoBet chat monitor - runs every 3 hours"
     }
   ]
 }
