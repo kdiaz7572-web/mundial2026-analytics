@@ -192,12 +192,34 @@ export default async function handler(req, res) {
     let groqOutput;
     try {
       const responseText = groqResponse.choices[0].message.content;
-      // Extract JSON from response (Groq may wrap it)
-      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) {
-        throw new Error('No JSON found in response');
+
+      // Try direct JSON parse first
+      try {
+        groqOutput = JSON.parse(responseText);
+      } catch (directParseError) {
+        // If direct parse fails, try extracting JSON object
+        const jsonMatches = responseText.match(/\{[\s\S]*?\}(?=\s*$|\s*[\]\}])/g);
+        if (!jsonMatches || jsonMatches.length === 0) {
+          throw new Error('No valid JSON found in response');
+        }
+
+        // Try each match, preferring longer ones (more complete)
+        groqOutput = null;
+        for (const match of jsonMatches.sort((a, b) => b.length - a.length)) {
+          try {
+            groqOutput = JSON.parse(match);
+            if (groqOutput.reasoning_chain || groqOutput.response) {
+              break; // Found the right object
+            }
+          } catch (e) {
+            // Continue to next match
+          }
+        }
+
+        if (!groqOutput) {
+          throw new Error('Unable to parse any valid JSON from response');
+        }
       }
-      groqOutput = JSON.parse(jsonMatch[0]);
     } catch (parseError) {
       console.error('Failed to parse Groq response:', parseError.message);
       return res.status(500).json({

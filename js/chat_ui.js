@@ -17,10 +17,25 @@ const ChatUI = {
     this.state.bankroll = bankroll;
     this.state.language = language;
     this.state.messages = [];
-    const saved = localStorage.getItem(`chat_${this.state.session_id}`);
-    if (saved) {
-      this.state.messages = JSON.parse(saved);
+
+    // Safely load saved chat history
+    try {
+      const saved = localStorage.getItem(`chat_${this.state.session_id}`);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        // Validate it's an array and not too large
+        if (Array.isArray(parsed) && parsed.length < 1000) {
+          this.state.messages = parsed;
+        } else {
+          console.warn('[ChatUI] Loaded chat data exceeds size limit or is invalid');
+          localStorage.removeItem(`chat_${this.state.session_id}`);
+        }
+      }
+    } catch (err) {
+      console.error('[ChatUI] Failed to load saved chat:', err);
+      localStorage.removeItem(`chat_${this.state.session_id}`);
     }
+
     return this.state.session_id;
   },
 
@@ -133,13 +148,33 @@ const ChatUI = {
       });
 
       this.renderMessagesArea();
-      localStorage.setItem(`chat_${this.state.session_id}`, JSON.stringify(this.state.messages));
+
+      // Safely save to localStorage
+      try {
+        localStorage.setItem(`chat_${this.state.session_id}`, JSON.stringify(this.state.messages));
+      } catch (storageError) {
+        console.error('[ChatUI] Failed to save chat history:', storageError);
+        if (storageError.name === 'QuotaExceededError') {
+          // Storage quota exceeded - delete old messages
+          this.state.messages = this.state.messages.slice(-50);
+          try {
+            localStorage.setItem(`chat_${this.state.session_id}`, JSON.stringify(this.state.messages));
+          } catch (retryError) {
+            console.error('[ChatUI] Failed to save even after cleanup');
+          }
+        }
+      }
 
     } catch (error) {
       console.error('Chat error:', error);
+      // Evitar duplicar "Error:" si ya está en el mensaje
+      let errorMsg = error.message;
+      if (!errorMsg.startsWith('Error:')) {
+        errorMsg = `Error: ${errorMsg}`;
+      }
       this.state.messages.push({
         role: 'assistant',
-        content: `Error: ${error.message}`
+        content: errorMsg
       });
       this.renderMessagesArea();
     } finally {
