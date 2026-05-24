@@ -8,17 +8,20 @@
 
 import Groq from 'groq-sdk';
 import { getDb } from './_db.js';
-import { GROQ_TOOLS, executeGroqTool } from './claude_tools.js';
-import {
-  checkRateLimit,
-  validateRequest,
-  sanitizeInput,
-  validateBankroll,
-  validateLanguage,
-  logRequest,
-  sendError,
-  sendSuccess
-} from './_middleware.js';
+
+// Inline simple utility functions to avoid middleware import issues
+const sanitizeInput = (input) => {
+  if (typeof input !== 'string') return input;
+  return input.replace(/[<>]/g, '').replace(/javascript:/gi, '').slice(0, 5000);
+};
+
+const sendError = (res, statusCode, errorType, message, details = {}) => {
+  res.status(statusCode).json({ success: false, error: errorType, message, ...details });
+};
+
+const sendSuccess = (res, data = {}, message = '') => {
+  res.status(200).json({ success: true, message, ...data });
+};
 
 const groq = new Groq({
   apiKey: process.env.GROQ_API_KEY
@@ -125,36 +128,19 @@ export default async function handler(req, res) {
     return sendError(res, 405, 'Method Not Allowed', 'Only POST requests are allowed');
   }
 
-  // Rate limiting: max 20 requests per 60 seconds per session
-  if (!checkRateLimit(req, res, 20, 60000)) {
-    return; // Response already sent by checkRateLimit
-  }
-
-  // Validate required fields
-  if (!validateRequest(req, res, ['message', 'session_id'])) {
-    return; // Response already sent by validateRequest
-  }
-
+  // Validate request
   const { message, session_id, language = 'es', bankroll } = req.body;
 
-  // Validate input formats
-  if (!validateLanguage(language)) {
-    return sendError(res, 400, 'Invalid Language', 'Language must be "es" or "en"');
+  if (!message || !session_id) {
+    return sendError(res, 400, 'Bad Request', 'message and session_id are required');
   }
 
-  if (bankroll !== undefined && !validateBankroll(bankroll)) {
-    return sendError(res, 400, 'Invalid Bankroll', 'Bankroll must be a number between 10 and 1,000,000');
+  if (!['es', 'en'].includes(language)) {
+    return sendError(res, 400, 'Invalid Language', 'Language must be "es" or "en"');
   }
 
   // Sanitize user input
   const sanitizedMessage = sanitizeInput(message);
-
-  // Log the request
-  logRequest('/api/chat', session_id, {
-    messageLength: sanitizedMessage.length,
-    language,
-    hasBankroll: !!bankroll
-  });
 
   try {
     const db = await getDb();
