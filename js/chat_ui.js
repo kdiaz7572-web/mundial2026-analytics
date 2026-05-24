@@ -1,6 +1,6 @@
 // ============================================================
 //  Chat UI Component - IA-Zak Conversational Interface
-//  Real-time chat with reasoning chains visible to user
+//  Real-time chat with reasoning chains + voice input
 // ============================================================
 
 const ChatUI = {
@@ -9,7 +9,9 @@ const ChatUI = {
     session_id: null,
     bankroll: null,
     language: 'es',
-    isLoading: false
+    isLoading: false,
+    isListening: false,
+    recognition: null
   },
 
   init(sessionId = null, bankroll = null, language = 'es') {
@@ -17,6 +19,9 @@ const ChatUI = {
     this.state.bankroll = bankroll;
     this.state.language = language;
     this.state.messages = [];
+
+    // Initialize Web Speech API for voice input
+    this.initVoiceRecognition();
 
     // Safely load saved chat history
     try {
@@ -39,6 +44,80 @@ const ChatUI = {
     return this.state.session_id;
   },
 
+  initVoiceRecognition() {
+    // Use Web Speech API for voice recognition
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (SpeechRecognition) {
+      this.state.recognition = new SpeechRecognition();
+      this.state.recognition.continuous = false;
+      this.state.recognition.interimResults = true;
+      this.state.recognition.lang = this.state.language === 'es' ? 'es-ES' : 'en-US';
+
+      this.state.recognition.onstart = () => {
+        this.state.isListening = true;
+        const btn = document.getElementById('voice-btn');
+        if (btn) {
+          btn.classList.add('bg-red-600', 'animate-pulse');
+          btn.classList.remove('bg-slate-700');
+          btn.textContent = '🎤 Escuchando...';
+        }
+      };
+
+      this.state.recognition.onresult = (event) => {
+        let interimTranscript = '';
+        let finalTranscript = '';
+
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const transcript = event.results[i][0].transcript;
+          if (event.results[i].isFinal) {
+            finalTranscript += transcript + ' ';
+          } else {
+            interimTranscript += transcript;
+          }
+        }
+
+        const input = document.getElementById('chat-input');
+        if (input) {
+          input.value = finalTranscript || interimTranscript;
+        }
+      };
+
+      this.state.recognition.onend = () => {
+        this.state.isListening = false;
+        const btn = document.getElementById('voice-btn');
+        if (btn) {
+          btn.classList.remove('bg-red-600', 'animate-pulse');
+          btn.classList.add('bg-slate-700');
+          btn.textContent = '🎤';
+        }
+      };
+
+      this.state.recognition.onerror = (event) => {
+        console.error('[ChatUI] Speech recognition error:', event.error);
+        const input = document.getElementById('chat-input');
+        if (input) {
+          input.placeholder = `Error: ${event.error}`;
+        }
+      };
+    }
+  },
+
+  toggleVoiceInput() {
+    if (!this.state.recognition) {
+      console.warn('[ChatUI] Speech Recognition not available');
+      return;
+    }
+
+    if (this.state.isListening) {
+      this.state.recognition.stop();
+    } else {
+      // Clear input before starting
+      const input = document.getElementById('chat-input');
+      if (input) input.value = '';
+      this.state.recognition.start();
+    }
+  },
+
   renderChatContainer() {
     return `
     <div class="chat-container flex flex-col h-[500px] bg-slate-900 rounded-lg border border-slate-700">
@@ -47,9 +126,14 @@ const ChatUI = {
       </div>
       <div class="border-t border-slate-700 p-4">
         <div class="flex gap-3">
-          <input id="chat-input" type="text" placeholder="¿Qué quieres analizar?"
+          <input id="chat-input" type="text" placeholder="¿Qué quieres analizar? (o usa 🎤)"
             class="flex-1 px-4 py-2 rounded-lg bg-slate-800 text-white border border-slate-600 focus:border-violet-500 outline-none"
             onkeypress="if(event.key==='Enter') ChatUI.sendMessage()" />
+          <button id="voice-btn" onclick="ChatUI.toggleVoiceInput()"
+            class="px-3 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-white font-bold transition-colors duration-200"
+            title="Presiona para hablar (reconocimiento de voz)">
+            🎤
+          </button>
           <button onclick="ChatUI.sendMessage()" class="px-4 py-2 rounded-lg bg-violet-600 hover:bg-violet-700 text-white font-bold transition-colors" id="chat-send-btn">
             📤
           </button>
