@@ -1,8 +1,12 @@
 {
   "version": 2,
   "name": "mundial2026-analytics",
-  "buildCommand": "npm install",
-  "outputDirectory": ".",
+  "functions": {
+    "api/**/*.js": {
+      "memory": 1024,
+      "maxDuration": 60
+    }
+  },
   "crons": [
     {
       "path": "/api/learn",
