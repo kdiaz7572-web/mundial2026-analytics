@@ -5,14 +5,21 @@
 // ============================================================
 
 import { getDb } from './_db.js';
+import { sendError, sendSuccess, logRequest } from './_middleware.js';
 
 const API_FOOTBALL_BASE = 'https://v3.football.api-sports.io';
 
 export default async function handler(req, res) {
   const secret = req.headers.authorization?.split(' ')[1];
   if (secret !== process.env.CRON_SECRET && !req.query.force) {
-    return res.status(401).json({ error: 'Unauthorized' });
+    return sendError(res, 401, 'Unauthorized', 'Invalid or missing authorization');
   }
+
+  // Set CORS headers for cron debugging
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+
+  logRequest('/api/verify_predictions', 'cron-job', { type: 'prediction-verification' });
 
   try {
     const db = await getDb();
@@ -66,26 +73,50 @@ export default async function handler(req, res) {
 
         // Store in prediction_accuracy for learning
         const marketKey = '1x2';
-        await db`
-          INSERT INTO prediction_accuracy (
-            match_id, market, model_prob, predicted_outcome, actual_outcome,
-            confidence_stars, edge_calc, brier_score_val, outcome_verified_at
-          ) VALUES (
-            ${pred.match_id},
-            ${marketKey},
-            ${pred.probability_home},
-            ${pred.probability_home > 0.5 ? 'home' : pred.probability_home < 0.5 ? 'away' : 'draw'},
-            ${actual.winner},
-            ${Math.round(pred.confidence * 5) || 3},
-            ${calculateEdge(pred.probability_home, actual.winner)},
-            ${brierScore},
-            NOW()
-          )
-          ON CONFLICT (match_id) DO UPDATE SET
-            actual_outcome = ${actual.winner},
-            brier_score_val = ${brierScore},
-            outcome_verified_at = NOW()
-        `;
+        const predictedOutcome = pred.probability_home > 0.5 ? 'home' :
+                                  pred.probability_home < 0.5 ? 'away' : 'draw';
+
+        try {
+          // Try to insert, handle if already exists
+          await db`
+            INSERT INTO prediction_accuracy (
+              match_id,
+              market,
+              model_probability,
+              predicted_outcome,
+              actual_outcome,
+              confidence_stars,
+              edge_calc,
+              brier_score_val,
+              outcome_verified_at,
+              created_at
+            ) VALUES (
+              ${pred.match_id},
+              ${marketKey},
+              ${pred.probability_home},
+              ${predictedOutcome},
+              ${actual.winner},
+              ${Math.round(pred.confidence * 5) || 3},
+              ${calculateEdge(pred.probability_home, actual.winner)},
+              ${brierScore},
+              NOW(),
+              NOW()
+            )
+          `;
+        } catch (insertError) {
+          // If unique constraint violation, update instead
+          if (insertError.code === '23505') {
+            await db`
+              UPDATE prediction_accuracy
+              SET actual_outcome = ${actual.winner},
+                  brier_score_val = ${brierScore},
+                  outcome_verified_at = NOW()
+              WHERE match_id = ${pred.match_id}
+            `;
+          } else {
+            throw insertError;
+          }
+        }
 
         // Track accuracy by market
         if (!accuracy_summary[marketKey]) {
@@ -152,22 +183,21 @@ export default async function handler(req, res) {
     console.log(`[VERIFY] 📊 Overall Accuracy: ${overall_accuracy}% | Avg Brier: ${avg_brier}`);
     console.log(`[VERIFY] 🎯 Surprises: ${surprises.length}`);
 
-    return res.status(200).json({
-      ok: true,
-      verified: verified.length,
-      surprises: surprises.length,
+    return sendSuccess(res, {
+      verified_count: verified.length,
+      surprises_count: surprises.length,
       overall_accuracy: overall_accuracy,
       avg_brier: avg_brier,
-      elapsed,
+      elapsed_ms: elapsed,
       summary,
+      predictions: verified.slice(0, 10), // Return first 10 for logging
       timestamp: new Date().toISOString()
-    });
+    }, `Verified ${verified.length} predictions`);
 
   } catch (error) {
     console.error('[VERIFY] Fatal error:', error);
-    return res.status(500).json({
-      error: 'Prediction verification failed',
-      message: error.message
+    return sendError(res, 500, 'Verification Failed', error.message, {
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
   }
 }

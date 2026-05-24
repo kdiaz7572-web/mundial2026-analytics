@@ -9,6 +9,16 @@
 import Groq from 'groq-sdk';
 import { getDb } from './_db.js';
 import { GROQ_TOOLS, executeGroqTool } from './claude_tools.js';
+import {
+  checkRateLimit,
+  validateRequest,
+  sanitizeInput,
+  validateBankroll,
+  validateLanguage,
+  logRequest,
+  sendError,
+  sendSuccess
+} from './_middleware.js';
 
 const groq = new Groq({
   apiKey: process.env.GROQ_API_KEY
@@ -102,15 +112,49 @@ CRITICAL RULES:
  * Response: { response: string, tool_calls: array, bankroll_impact?: number, error?: string }
  */
 export default async function handler(req, res) {
+  // Set CORS headers
+  res.setHeader('Access-Control-Allow-Origin', 'https://mundial2026-analytics.vercel.app');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    return sendError(res, 405, 'Method Not Allowed', 'Only POST requests are allowed');
+  }
+
+  // Rate limiting: max 20 requests per 60 seconds per session
+  if (!checkRateLimit(req, res, 20, 60000)) {
+    return; // Response already sent by checkRateLimit
+  }
+
+  // Validate required fields
+  if (!validateRequest(req, res, ['message', 'session_id'])) {
+    return; // Response already sent by validateRequest
   }
 
   const { message, session_id, language = 'es', bankroll } = req.body;
 
-  if (!message || !session_id) {
-    return res.status(400).json({ error: 'message and session_id are required' });
+  // Validate input formats
+  if (!validateLanguage(language)) {
+    return sendError(res, 400, 'Invalid Language', 'Language must be "es" or "en"');
   }
+
+  if (bankroll !== undefined && !validateBankroll(bankroll)) {
+    return sendError(res, 400, 'Invalid Bankroll', 'Bankroll must be a number between 10 and 1,000,000');
+  }
+
+  // Sanitize user input
+  const sanitizedMessage = sanitizeInput(message);
+
+  // Log the request
+  logRequest('/api/chat', session_id, {
+    messageLength: sanitizedMessage.length,
+    language,
+    hasBankroll: !!bankroll
+  });
 
   try {
     const db = await getDb();
@@ -131,7 +175,7 @@ export default async function handler(req, res) {
       if (msg.user_message) messages.push({ role: 'user', content: msg.user_message });
       if (msg.zak_response) messages.push({ role: 'assistant', content: msg.zak_response });
     });
-    messages.push({ role: 'user', content: message });
+    messages.push({ role: 'user', content: sanitizedMessage });
 
     // =====================================================
     // 2. Prepare system prompt with user context
@@ -179,10 +223,8 @@ export default async function handler(req, res) {
     } catch (groqError) {
       console.error('Groq API error:', groqError.message);
       // Fallback: return simple response without LLM
-      return res.status(500).json({
-        error: 'Groq API unavailable',
-        fallback: true,
-        message: 'IA-Zak is temporarily offline. Try again in a moment.'
+      return sendError(res, 503, 'Service Unavailable', 'IA-Zak is temporarily offline. Try again in a moment.', {
+        fallback: true
       });
     }
 
@@ -222,10 +264,7 @@ export default async function handler(req, res) {
       }
     } catch (parseError) {
       console.error('Failed to parse Groq response:', parseError.message);
-      return res.status(500).json({
-        error: 'Failed to parse AI response',
-        message: 'Please try again with a clearer question.'
-      });
+      return sendError(res, 500, 'Parse Error', 'Failed to parse AI response. Please try again with a clearer question.');
     }
 
     // =====================================================
@@ -280,8 +319,7 @@ export default async function handler(req, res) {
     // =====================================================
     // 7. Return response with all Groq output fields
     // =====================================================
-    return res.status(200).json({
-      success: true,
+    return sendSuccess(res, {
       response: groqOutput.response || groqOutput.analysis || 'No response generated',
       reasoning_chain: groqOutput.reasoning_chain || [],
       recommendations: groqOutput.recommendations || [],
@@ -292,13 +330,12 @@ export default async function handler(req, res) {
       tool_calls: executedTools,
       bankroll_impact: bankrollImpact > 0 ? Math.round(bankrollImpact * 10000) / 100 : null,
       language: language
-    });
+    }, 'Analysis complete');
 
   } catch (error) {
     console.error('Chat endpoint error:', error);
-    return res.status(500).json({
-      error: 'Internal server error',
-      message: error.message
+    return sendError(res, 500, 'Internal Server Error', error.message, {
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
   }
 }
