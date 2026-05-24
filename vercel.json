@@ -28,6 +28,11 @@
       "path": "/api/verify_predictions",
       "schedule": "15 22 * * *",
       "description": "Post-partidos (22:15 UTC) - Verificar predicciones vs resultados"
+    },
+    {
+      "path": "/api/learning",
+      "schedule": "45 22 * * *",
+      "description": "Post-verificación (22:45 UTC) - Ajuste dinámico de pesos"
     }
   ],
   "headers": [

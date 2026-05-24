@@ -19,6 +19,7 @@ const TABS = [
   { id: 'calendario', label: '📅 Calendario' },
   { id: 'apuestas',   label: '💡 Apuestas' },
   { id: 'zak',        label: '🤖 IA-Zak' },
+  { id: 'analytics',  label: '📈 Analytics' },
 ];
 
 const CONFEDERATIONS = ['ALL','UEFA','CONMEBOL','CONCACAF','CAF','AFC','OFC'];
@@ -1694,6 +1695,7 @@ function switchTab(tab) {
     calendario: renderCalendar,
     apuestas:   renderBetting,
     zak:        renderZakAgent,
+    analytics:  renderAnalytics,
   };
   if (renders[tab]) renders[tab]();
   window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -2843,6 +2845,18 @@ function renderZakAgent() {
 
     </div>
 
+    <!-- ═══ CHAT SECTION ═══ -->
+    <div class="card p-5 mt-5">
+      <div class="flex items-center gap-2 mb-4">
+        <span class="text-lg">💬</span>
+        <div>
+          <p class="text-sm font-bold text-white">Chat con IA-Zak</p>
+          <p class="text-[10px] text-slate-500">Razonamiento tipo Claude con fuentes visibles</p>
+        </div>
+      </div>
+      <div id="zak-chat-container"></div>
+    </div>
+
   </div>`;
 
   // Pre-llenar si ya hay selección previa
@@ -2853,6 +2867,14 @@ function renderZakAgent() {
   if (ZAK_STATE.awayKey) {
     const sel = document.getElementById('zak-away');
     if (sel) { sel.value = ZAK_STATE.awayKey; _zakUpdateFlagPreview(); }
+  }
+
+  // Initialize chat UI
+  const sessionId = ChatUI.init(null, STATE.bankroll || 5000, 'es');
+  const chatContainer = document.getElementById('zak-chat-container');
+  if (chatContainer) {
+    chatContainer.innerHTML = ChatUI.renderChatContainer();
+    ChatUI.renderMessagesArea();
   }
 
   // Load intel in background (non-blocking)
@@ -3508,4 +3530,46 @@ function _renderZakPlayerPanel(homeKey, awayKey) {
   };
 
   renderCards();
+}
+
+// ============================================================
+//  📈 ANALYTICS — Learning Metrics Dashboard
+// ============================================================
+
+function renderAnalytics() {
+  document.getElementById('app-content').innerHTML = `
+  <div class="fade-in space-y-5">
+    <!-- Header -->
+    <div class="relative overflow-hidden rounded-2xl border border-blue-800/40 p-6 sm:p-8"
+         style="background:linear-gradient(135deg,#0a0c20 0%,#0f0d2e 50%,#0a0c20 100%);">
+      <span class="absolute left-0 top-1/2 -translate-y-1/2 text-[120px] opacity-[0.04] select-none leading-none pointer-events-none">📊</span>
+      <span class="absolute right-4 top-1/2 -translate-y-1/2 text-[90px] opacity-[0.06] select-none leading-none pointer-events-none">📈</span>
+      <div class="relative z-10 flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6">
+        <div class="flex-1">
+          <div class="flex items-center gap-2 mb-2">
+            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-900/60 border border-blue-700/50 text-blue-300 text-[10px] font-bold tracking-widest uppercase">
+              📊 Learning Analytics
+            </span>
+          </div>
+          <h2 class="text-2xl sm:text-3xl font-black text-white leading-none mb-1">
+            Métricas de Aprendizaje
+          </h2>
+          <p class="text-slate-400 text-sm leading-relaxed">
+            Precisión de predicciones, Brier Score, y ajuste dinámico de pesos de fuentes
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Learning Dashboard Widget -->
+    <div id="learning-dashboard-widget"></div>
+  </div>`;
+
+  // Initialize and render learning dashboard
+  LearningDashboard.init().then(() => {
+    const widget = document.getElementById('learning-dashboard-widget');
+    if (widget) {
+      widget.innerHTML = LearningDashboard.renderWidget();
+    }
+  });
 }
