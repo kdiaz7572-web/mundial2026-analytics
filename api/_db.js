@@ -50,7 +50,7 @@ async function migrate(sql) {
   await sql`
     CREATE TABLE IF NOT EXISTS fixture_results (
       id          SERIAL PRIMARY KEY,
-      fixture_id  TEXT        NOT NULL UNIQUE,
+      fixture_id  TEXT        NOT NULL,
       home        TEXT        NOT NULL,
       away        TEXT        NOT NULL,
       home_goals  INTEGER,
@@ -70,7 +70,6 @@ async function migrate(sql) {
       lambda_home NUMERIC(4,2),
       lambda_away NUMERIC(4,2),
       created_at  TIMESTAMPTZ DEFAULT NOW(),
-      UNIQUE(home_key, away_key)
     )
   `;
 
@@ -112,7 +111,6 @@ async function migrate(sql) {
       raw_json        JSONB,
       source          TEXT        DEFAULT 'api-football',
       fetched_at      TIMESTAMPTZ DEFAULT NOW(),
-      UNIQUE(player_id_api, season)
     )
   `;
 
@@ -144,7 +142,7 @@ async function migrate(sql) {
   await sql`
     CREATE TABLE IF NOT EXISTS zak_team_intel (
       id           SERIAL PRIMARY KEY,
-      team_key     TEXT        NOT NULL UNIQUE,
+      team_key     TEXT        NOT NULL,
       injuries     TEXT,
       form_notes   TEXT,
       news         TEXT,
@@ -184,7 +182,7 @@ async function migrate(sql) {
   await sql`
     CREATE TABLE IF NOT EXISTS match_predictions (
       id                   SERIAL PRIMARY KEY,
-      match_id             VARCHAR(50) UNIQUE,
+      match_id             VARCHAR(50),
       date_match           TIMESTAMP,
       home_team            VARCHAR(100),
       away_team            VARCHAR(100),
