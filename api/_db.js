@@ -152,7 +152,72 @@ async function migrate(sql) {
       attack_mod   NUMERIC(4,3) DEFAULT 1.0,
       defense_mod  NUMERIC(4,3) DEFAULT 1.0,
       confidence   TEXT        DEFAULT 'medium',
+      injuries_detailed JSONB,
+      form_last_10 JSONB,
+      xg_metrics   JSONB,
+      last_updated_at TIMESTAMPTZ DEFAULT NOW(),
       updated_at   TIMESTAMPTZ DEFAULT NOW()
+    )
+  `;
+
+  // ── Player injuries — REAL-TIME tracking ─────────────
+  await sql`
+    CREATE TABLE IF NOT EXISTS player_injuries (
+      id               SERIAL PRIMARY KEY,
+      player_id        INTEGER,
+      player_name      VARCHAR(100) NOT NULL,
+      team             VARCHAR(100),
+      injury_type      VARCHAR(100),
+      date_injured     TIMESTAMP,
+      expected_return  DATE,
+      status           VARCHAR(50),
+      severity         VARCHAR(20),
+      impact_on_team   NUMERIC(3,1),
+      data_source      VARCHAR(50),
+      last_verified    TIMESTAMP,
+      created_at       TIMESTAMPTZ DEFAULT NOW(),
+      INDEX (player_name, team)
+    )
+  `;
+
+  // ── Match predictions — WITH reasoning chain ────────
+  await sql`
+    CREATE TABLE IF NOT EXISTS match_predictions (
+      id                   SERIAL PRIMARY KEY,
+      match_id             VARCHAR(50) UNIQUE,
+      date_match           TIMESTAMP,
+      home_team            VARCHAR(100),
+      away_team            VARCHAR(100),
+      probability_home     NUMERIC(5,4),
+      probability_draw     NUMERIC(5,4),
+      probability_away     NUMERIC(5,4),
+      xg_home              NUMERIC(4,2),
+      xg_away              NUMERIC(4,2),
+      model_version        VARCHAR(20),
+      confidence           VARCHAR(20),
+      reasoning_chain      JSONB,
+      data_sources_used    JSONB,
+      created_at           TIMESTAMPTZ DEFAULT NOW(),
+      verified_at          TIMESTAMPTZ,
+      INDEX (match_id, model_version)
+    )
+  `;
+
+  // ── Reasoning logs — TRANSPARENCY: cada paso visible ──
+  await sql`
+    CREATE TABLE IF NOT EXISTS reasoning_logs (
+      id                   SERIAL PRIMARY KEY,
+      conversation_id      VARCHAR(100),
+      user_question        TEXT,
+      reasoning_steps      TEXT,
+      data_sources_checked JSONB,
+      conflicts_found      JSONB,
+      uncertainties        JSONB,
+      final_recommendation TEXT,
+      confidence_level     VARCHAR(20),
+      user_bankroll        NUMERIC(12,2),
+      created_at           TIMESTAMPTZ DEFAULT NOW(),
+      INDEX (conversation_id, created_at)
     )
   `;
 

@@ -6,7 +6,28 @@
   "crons": [
     {
       "path": "/api/learn",
-      "schedule": "0 6 * * *"
+      "schedule": "0 6 * * *",
+      "description": "Diario - Tavily research + general intel"
+    },
+    {
+      "path": "/api/fbref_sync",
+      "schedule": "30 */6 * * *",
+      "description": "Cada 6 horas + 30min - Estadísticas FBREF"
+    },
+    {
+      "path": "/api/understat_sync",
+      "schedule": "0 */6 * * *",
+      "description": "Cada 6 horas - xG de Understat"
+    },
+    {
+      "path": "/api/transfermarkt_tracker",
+      "schedule": "0 * * * *",
+      "description": "CADA HORA - Rastreador de lesiones críticas (REAL-TIME)"
+    },
+    {
+      "path": "/api/verify_predictions",
+      "schedule": "15 22 * * *",
+      "description": "Post-partidos (22:15 UTC) - Verificar predicciones vs resultados"
     }
   ],
   "headers": [
