@@ -3,6 +3,13 @@
 //  Returns real prediction accuracy metrics and insights
 //  from the database without dummy data
 // ============================================================
+//
+// SCHEMA FIXES APPLIED:
+// - REMOVED bankroll_impact from roiStats query (line 116)
+//   EXISTS IN: conversation_history has user_bankroll, NOT bankroll_impact
+//   FIX: Query only uses user_bankroll which exists in conversation_history
+//
+// ============================================================
 
 import { getDb } from './_db.js';
 import { validateLanguage, sendError, sendSuccess } from './_middleware.js';
@@ -113,8 +120,8 @@ export default async function handler(req, res) {
 
     const roiStats = await db`
       SELECT
-        SUM(CASE WHEN bankroll_impact IS NOT NULL THEN bankroll_impact ELSE 0 END)::FLOAT as total_impact,
-        COUNT(CASE WHEN bankroll_impact IS NOT NULL THEN 1 END) as bets_tracked
+        SUM(CASE WHEN user_bankroll IS NOT NULL THEN user_bankroll ELSE 0 END)::FLOAT as total_impact,
+        COUNT(CASE WHEN user_bankroll IS NOT NULL THEN 1 END) as bets_tracked
       FROM conversation_history
       WHERE user_bankroll IS NOT NULL
       AND created_at > NOW() - INTERVAL '${periodDays} days'

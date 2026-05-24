@@ -3,6 +3,18 @@
 //  Runs after matches complete (22:15 UTC) to verify predictions
 //  Calculates Brier Score, updates learning data, auto-learning
 // ============================================================
+//
+// SCHEMA FIXES APPLIED:
+// - REMOVED UPDATE of match_predictions with non-existent columns (lines 68-70):
+//   REMOVED: verified_result, brier_score, verified_accurate (don't exist in match_predictions)
+//   KEPT: verified_at (valid column)
+//
+// - FIXED INSERT INTO prediction_accuracy column names (line 85):
+//   CHANGED: model_probability -> model_prob (schema uses model_prob)
+//
+// - KEPT brier_score_val in INSERT/UPDATE (valid in prediction_accuracy schema)
+//
+// ============================================================
 
 import { getDb } from './_db.js';
 import { sendError, sendSuccess, logRequest } from './_middleware.js';
@@ -62,12 +74,11 @@ export default async function handler(req, res) {
         total_brier_score += brierScore;
 
         // Update prediction record with verification
+        // NOTE: match_predictions table only has verified_at column for verification
+        // Accuracy tracking is stored in prediction_accuracy table (see below)
         await db`
           UPDATE match_predictions
-          SET verified_at = NOW(),
-              verified_result = ${actual.winner},
-              brier_score = ${brierScore},
-              verified_accurate = ${modelAccurate}
+          SET verified_at = NOW()
           WHERE id = ${pred.id}
         `;
 
@@ -82,7 +93,7 @@ export default async function handler(req, res) {
             INSERT INTO prediction_accuracy (
               match_id,
               market,
-              model_probability,
+              model_prob,
               predicted_outcome,
               actual_outcome,
               confidence_stars,
@@ -214,7 +225,7 @@ async function getActualResult(matchId) {
     const [cached] = await db`
       SELECT home_goals, away_goals FROM fixture_results
       WHERE fixture_id = ${matchId}
-      AND updated_at > NOW() - INTERVAL '1 hour'
+      AND played_at > NOW() - INTERVAL '1 hour'
       LIMIT 1
     `;
 

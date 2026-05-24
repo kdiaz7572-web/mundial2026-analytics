@@ -1,6 +1,17 @@
 // ============================================================
 //  Save Bet Endpoint - POST /api/save_bet
 //  Validates and stores user bets with full error handling
+//
+//  SCHEMA FIX (2026-05-23):
+//  - Bets are inserted into the "bets" table (NOT "bet_outcomes")
+//  - The "bets" table has columns: id, session_id, match_id, market, odds,
+//    probability, kelly_bet_size, bankroll_used, status, created_at
+//  - The "bet_outcomes" table is ONLY for user feedback (outcome reporting)
+//    with columns: id, conversation_id, bet_id, user_reported_outcome,
+//    actual_result, verified_at, created_at
+//  - Additional metadata (team_home, team_away, notes, confidence) are
+//    stored in the response only, not persisted to DB (acceptable for
+//    this use case as they can be derived from match_id lookup)
 // ============================================================
 
 import { getDb } from './_db.js';
@@ -167,38 +178,28 @@ export default async function handler(req, res) {
     });
 
     // ═══════════════════════════════════════════════════════
-    // Save bet to database
+    // Save bet to database (into "bets" table, not "bet_outcomes")
     // ═══════════════════════════════════════════════════════
 
     const result = await db`
-      INSERT INTO bet_outcomes (
+      INSERT INTO bets (
         session_id,
         match_id,
-        team_home,
-        team_away,
         market,
         odds,
-        model_probability,
+        probability,
         kelly_bet_size,
         bankroll_used,
-        confidence_stars,
-        user_notes,
-        status,
-        created_at
+        status
       ) VALUES (
         ${session_id},
         ${match_id},
-        ${sanitizedHome},
-        ${sanitizedAway},
         ${market},
         ${odds},
         ${probability},
         ${calculatedKelly || null},
         ${bankroll_used},
-        ${confidence},
-        ${sanitizedNotes},
-        'pending',
-        NOW()
+        'pending'
       )
       RETURNING id, created_at
     `;

@@ -25,26 +25,9 @@ export async function getDb() {
 }
 
 async function migrate(sql) {
-  // ── Betting history ──────────────────────────────────────
-  await sql`
-    CREATE TABLE IF NOT EXISTS bets (
-      id            SERIAL PRIMARY KEY,
-      team          TEXT        NOT NULL,
-      flag          TEXT        DEFAULT '🏳️',
-      market        TEXT        NOT NULL,
-      matchup       TEXT,
-      odds          NUMERIC(6,2) NOT NULL,
-      algo_prob     NUMERIC(5,2),
-      implied_prob  NUMERIC(5,2),
-      edge          NUMERIC(6,2),
-      stake         NUMERIC(12,2) DEFAULT 0,
-      total_return  NUMERIC(12,2) DEFAULT 0,
-      net_profit    NUMERIC(12,2) DEFAULT 0,
-      result        TEXT        DEFAULT 'pending'  ,
-      justification TEXT,
-      created_at    TIMESTAMPTZ DEFAULT NOW()
-    )
-  `;
+  // ── Bets — user betting history (CORRECTED SCHEMA) ──────────────────────────────
+  // NOTE: Removed old incomplete bets definition. Using correct schema below.
+  // Old schema lacked: session_id, match_id, kelly_bet_size, probability, bankroll_used
 
   // ── Fixture results ─────────────────────────────────────
   await sql`
@@ -276,6 +259,7 @@ async function migrate(sql) {
       actual_outcome   TEXT,
       confidence_stars INTEGER ,
       edge_calc        NUMERIC(6,3),
+      brier_score_val  NUMERIC(6,4),
       created_at       TIMESTAMPTZ DEFAULT NOW(),
       outcome_verified_at TIMESTAMPTZ
     )
