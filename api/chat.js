@@ -160,21 +160,29 @@ export default async function handler(req, res) {
     const db = await getDb();
 
     // =====================================================
-    // 1. Load conversation history
+    // 1. Load conversation history (with error handling)
     // =====================================================
-    const conversationHistory = await db`
-      SELECT user_message, zak_response FROM conversation_history
-      WHERE session_id = ${session_id}
-      ORDER BY created_at DESC
-      LIMIT 10
-    `;
+    let conversationHistory = [];
+    try {
+      conversationHistory = await db`
+        SELECT user_message, zak_response FROM conversation_history
+        WHERE session_id = ${session_id}
+        ORDER BY created_at DESC
+        LIMIT 10
+      `;
+    } catch (historyError) {
+      console.warn('[chat] Could not load conversation history:', historyError.message);
+      conversationHistory = [];
+    }
 
     // Format for Groq: alternate user and assistant messages
     const messages = [];
-    conversationHistory.reverse().forEach(msg => {
-      if (msg.user_message) messages.push({ role: 'user', content: msg.user_message });
-      if (msg.zak_response) messages.push({ role: 'assistant', content: msg.zak_response });
-    });
+    if (Array.isArray(conversationHistory)) {
+      conversationHistory.reverse().forEach(msg => {
+        if (msg && msg.user_message) messages.push({ role: 'user', content: msg.user_message });
+        if (msg && msg.zak_response) messages.push({ role: 'assistant', content: msg.zak_response });
+      });
+    }
     messages.push({ role: 'user', content: sanitizedMessage });
 
     // =====================================================
@@ -224,10 +232,17 @@ export default async function handler(req, res) {
       });
     } catch (groqError) {
       console.error('Groq API error:', groqError.message);
-      // Fallback: return simple response without LLM
-      return sendError(res, 503, 'Service Unavailable', 'IA-Zak is temporarily offline. Try again in a moment.', {
+      // Fallback: return basic response without LLM
+      return sendSuccess(res, {
+        response: 'IA-Zak está temporalmente offline. Intenta de nuevo en un momento.',
+        reasoning_chain: ['Intentando conectar con Groq...', 'Servicio no disponible', 'Retornando respuesta de fallback'],
+        recommendations: [],
+        kelly_calculations: null,
+        data_sources_used: [],
+        confidence: 'low',
+        tool_calls: [],
         fallback: true
-      });
+      }, 'IA-Zak fallback mode');
     }
 
     // =====================================================
@@ -308,10 +323,8 @@ export default async function handler(req, res) {
     // =====================================================
     try {
       await db`
-        INSERT INTO conversation_history
-        (session_id, user_message, zak_response, function_calls_json, user_bankroll, created_at)
-        VALUES
-        (${session_id}, ${message}, ${groqOutput.response || ''}, ${JSON.stringify(executedTools)}, ${bankroll || null}, NOW())
+        INSERT INTO conversation_history (session_id, user_message, zak_response, user_bankroll, created_at)
+        VALUES (${session_id}, ${sanitizedMessage}, ${groqOutput.response || ''}, ${bankroll || null}, NOW())
       `;
     } catch (dbError) {
       console.error('Failed to store conversation:', dbError.message);
