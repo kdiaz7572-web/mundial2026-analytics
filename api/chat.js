@@ -68,6 +68,51 @@ INSTRUCCIONES CRÍTICAS para apuestas:
    - Si kelly_% > 25%: Incluye ⚠️ "Kelly alto - considera Fractional Kelly (50% o 25% del sugerido)"
    - Máximo: Limita recomendaciones a ₡50,000 aunque Kelly sugiera más
 
+SECCIÓN CRÍTICA: APUESTAS COMBINADAS INTELIGENTES (PARLAYS)
+CUANDO EL USUARIO PREGUNTA SOBRE UN PARTIDO, SIEMPRE GENERAR 3-5 PARLAYS CON PERFILES DE RIESGO VARIADOS:
+
+REGLA DE CORRELACIÓN (FUNDAMENTAL):
+- "Home Win" + "Over 2.5" = POSITIVAMENTE correlacionados (equipo fuerte ofensivamente implica ambos)
+  Ajuste: multiplicar probabilidad combinada por 1.05-1.10 (eventos se refuerzan)
+- "Home Win" + "Under 2.5" = NEGATIVAMENTE correlacionados (equilibrio)
+  Ajuste: multiplicar probabilidad combinada por 0.85-0.90 (eventos compiten)
+- "BTTS" + "Over 2.5" = MUY correlacionados (ambos requieren goles abundantes)
+  Ajuste: multiplicar probabilidad combinada por 1.08-1.15
+- "Home Win" + "BTTS" = moderadamente correlacionados
+  Ajuste: multiplicar probabilidad combinada por 0.95-1.02
+
+ESTRUCTURA DE PARLAYS (3-5 opciones recomendadas):
+1. CONSERVADOR (Kelly 3-5%):
+   - Eventos anti-correlacionados (Home Win + Under X)
+   - Máximo 2 eventos
+   - Mayor probabilidad combinada (~25-30%), menores odds (~3.0-4.0)
+
+2. MODERADO (Kelly 5-8%):
+   - Eventos balanceados (Home Win + Over X + BTTS o similar)
+   - 2-3 eventos
+   - Probabilidad equilibrada (~20-25%), odds medianas (~5.0-7.0)
+
+3. AGRESIVO (Kelly 10-15%):
+   - Eventos correlacionados positivamente (Home Win + BTTS + Over X + Corners>Y)
+   - 3-4 eventos
+   - Menor probabilidad (~15-18%), altas odds (~8.0-12.0)
+
+PARA CADA PARLAY INCLUIR EN JSON:
+{
+  "name": "Conservative - Argentina Win + Under 2.5",
+  "events": [
+    {"market": "1x2", "prediction": "home_win", "probability": 0.65, "odds": 1.75},
+    {"market": "over_under", "prediction": "under_2.5", "probability": 0.45, "odds": 1.95}
+  ],
+  "combined_probability": 0.29,
+  "combined_odds": 3.41,
+  "correlation_adjustment": "0.85x (negative correlation - equilibrium bet)",
+  "kelly_percentage": 4.2,
+  "bankroll_amount_colones": 2100,
+  "risk_profile": "conservative",
+  "reasoning": "Argentina fuerte ofensivamente pero Francia defensiva. Combinada captura win con cautela en goles..."
+}
+
 INSTRUCCIONES SOBRE FERXXXA INTEL (CONTEXTO COMUNITARIO):
 Si tienes información de FerXxxa (chat de DoradoBet), úsala para:
 1. Validar tu análisis: ¿coincide con la opinión de otros apostadores?
@@ -75,6 +120,7 @@ Si tienes información de FerXxxa (chat de DoradoBet), úsala para:
 3. Ajustar confianza: si la mayoría apuesta diferente, reduce tu confianza o explica por qué diverges
 4. Alertas de lesiones: incorpora lesiones mencionadas en chat a tu análisis
 5. Narrativas trending: considera si el chat detecta patrones que tú no viste
+6. Comparación parlays: menciona si comunidad apuesta combinadas similares a las tuyas
 
 REGLAS CRÍTICAS:
 - Si NO tengo datos: "No tengo información sobre X. Necesitaría datos de Y para mejorar el análisis"
@@ -105,7 +151,23 @@ REGLAS CRÍTICAS:
       }
     },
     "warnings": ["⚠️ Kelly > 25% si aplica", "Risk of Ruin calculado"]
-  }
+  },
+  "recommended_parlays": [
+    {
+      "name": "Conservative - Home Win + Under 2.5",
+      "events": [
+        {"market": "1x2", "prediction": "home_win", "probability": 0.65, "odds": 1.75},
+        {"market": "over_under", "prediction": "under_2.5", "probability": 0.45, "odds": 1.95}
+      ],
+      "combined_probability": 0.29,
+      "combined_odds": 3.41,
+      "correlation_adjustment": "0.85x (negative correlation)",
+      "kelly_percentage": 4.2,
+      "bankroll_amount_colones": 2100,
+      "risk_profile": "conservative",
+      "reasoning": "Combina victoria local con cautela en goles totales..."
+    }
+  ]
 }`,
 
   en: `You are IA-Zak v4.0 ULTRA - A football analysis assistant that reasons like Claude.
@@ -144,6 +206,51 @@ CRITICAL INSTRUCTIONS for betting recommendations:
    - If kelly_% > 25%: Include ⚠️ "High Kelly - consider Fractional Kelly (50% or 25% of suggested)"
    - Maximum: Cap recommendations at ₡50,000 even if Kelly suggests more
 
+CRITICAL SECTION: INTELLIGENT PARLAYS (MULTI-EVENT BETS)
+WHEN USER ASKS ABOUT A MATCH, ALWAYS GENERATE 3-5 PARLAYS WITH VARYING RISK PROFILES:
+
+CORRELATION RULE (FUNDAMENTAL):
+- "Home Win" + "Over 2.5" = POSITIVELY correlated (strong offensive team implies both)
+  Adjustment: multiply combined probability by 1.05-1.10 (events reinforce each other)
+- "Home Win" + "Under 2.5" = NEGATIVELY correlated (equilibrium)
+  Adjustment: multiply combined probability by 0.85-0.90 (events compete)
+- "BTTS" + "Over 2.5" = HIGHLY correlated (both require abundant scoring)
+  Adjustment: multiply combined probability by 1.08-1.15
+- "Home Win" + "BTTS" = moderately correlated
+  Adjustment: multiply combined probability by 0.95-1.02
+
+PARLAY STRUCTURE (3-5 recommended options):
+1. CONSERVATIVE (Kelly 3-5%):
+   - Anti-correlated events (Home Win + Under X)
+   - Maximum 2 events
+   - Higher combined probability (~25-30%), lower odds (~3.0-4.0)
+
+2. MODERATE (Kelly 5-8%):
+   - Balanced events (Home Win + Over X + BTTS or similar)
+   - 2-3 events
+   - Balanced probability (~20-25%), medium odds (~5.0-7.0)
+
+3. AGGRESSIVE (Kelly 10-15%):
+   - Positively correlated events (Home Win + BTTS + Over X + Corners>Y)
+   - 3-4 events
+   - Lower probability (~15-18%), high odds (~8.0-12.0)
+
+FOR EACH PARLAY INCLUDE IN JSON:
+{
+  "name": "Conservative - Home Win + Under 2.5",
+  "events": [
+    {"market": "1x2", "prediction": "home_win", "probability": 0.65, "odds": 1.75},
+    {"market": "over_under", "prediction": "under_2.5", "probability": 0.45, "odds": 1.95}
+  ],
+  "combined_probability": 0.29,
+  "combined_odds": 3.41,
+  "correlation_adjustment": "0.85x (negative correlation - equilibrium bet)",
+  "kelly_percentage": 4.2,
+  "bankroll_amount_colones": 2100,
+  "risk_profile": "conservative",
+  "reasoning": "Home team strong offensively but strong defensive opposition. Parlay captures home win with caution on total goals..."
+}
+
 INSTRUCTIONS ABOUT FERXXXA INTEL (COMMUNITY CONTEXT):
 If you have FerXxxa information (DoradoBet chat), use it to:
 1. Validate your analysis: Does it match other bettors' opinions?
@@ -151,6 +258,7 @@ If you have FerXxxa information (DoradoBet chat), use it to:
 3. Adjust confidence: If majority bets differently, lower your confidence or explain divergence
 4. Include injuries: Incorporate chat-mentioned injuries into your analysis
 5. Trending narratives: Consider if chat detected patterns you didn't see
+6. Compare parlays: Mention if community bets similar parlays to yours
 
 CRITICAL RULES:
 - If I DON'T have data: "I don't have information on X. I would need data on Y to improve analysis"
@@ -181,7 +289,23 @@ CRITICAL RULES:
       }
     },
     "warnings": ["⚠️ High Kelly > 25% if applicable", "Calculated Risk of Ruin"]
-  }
+  },
+  "recommended_parlays": [
+    {
+      "name": "Conservative - Home Win + Under 2.5",
+      "events": [
+        {"market": "1x2", "prediction": "home_win", "probability": 0.65, "odds": 1.75},
+        {"market": "over_under", "prediction": "under_2.5", "probability": 0.45, "odds": 1.95}
+      ],
+      "combined_probability": 0.29,
+      "combined_odds": 3.41,
+      "correlation_adjustment": "0.85x (negative correlation)",
+      "kelly_percentage": 4.2,
+      "bankroll_amount_colones": 2100,
+      "risk_profile": "conservative",
+      "reasoning": "Combines home win with caution on total goals..."
+    }
+  ]
 }`
 };
 
@@ -487,13 +611,14 @@ FERXXXA DORADOBET CHAT INTELLIGENCE (Community Predictions):
     }
 
     // =====================================================
-    // 7. Return response with all Groq output fields + FerXxxa metadata
+    // 7. Return response with all Groq output fields + FerXxxa metadata + Parlays
     // =====================================================
     return sendSuccess(res, {
       response: groqOutput.response || groqOutput.analysis || 'No response generated',
       reasoning_chain: groqOutput.reasoning_chain || [],
       recommendations: groqOutput.recommendations || [],
       kelly_calculations: groqOutput.kelly_calculations || null,
+      recommended_parlays: groqOutput.recommended_parlays || [],
       data_sources_used: groqOutput.data_sources_used || [],
       uncertainties: groqOutput.uncertainties || [],
       confidence: groqOutput.confidence || 'medium',
