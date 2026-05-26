@@ -1,0 +1,289 @@
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                    FerXxxa ↔ IA-Zak Integration                              ║
+║                         Complete System Flow                                  ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                         LAYER 1: DATA COLLECTION                              │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+    ┌─────────────────────┐
+    │  DORADOBET CHAT     │
+    │  (Real-time bettors)│
+    │                     │
+    │ • Predictions (1x2) │
+    │ • Odds updates      │
+    │ • Injury reports    │
+    │ • Chat sentiment    │
+    └──────────┬──────────┘
+               │
+               │  (Every 3 hours: 0 */3 * * *)
+               │
+    ┌──────────▼──────────────────────────────────────────┐
+    │           /api/ferxxxa-intel (Cron Job)            │
+    │                                                      │
+    │  - Fetch DoradoBet predictions                      │
+    │  - Extract trending narratives                      │
+    │  - Parse injury alerts                              │
+    │  - Calculate sentiment (positive/negative)          │
+    │  - Summarize odds movement                          │
+    │                                                      │
+    │  Response: { ferxxxa_intel: { ... } }               │
+    └──────────┬──────────────────────────────────────────┘
+               │
+               │  (INSERT INTO zak_intel)
+               │
+    ┌──────────▼──────────────────────────────────────────┐
+    │          PostgreSQL: zak_intel Table                │
+    │  ┌──────────────────────────────────────────────┐   │
+    │  │ id  │ topic           │ summary_json │ ... │   │
+    │  ├─────┼─────────────────┼──────────────┼─────┤   │
+    │  │ 1   │ ferxxxa_intel   │ { trends,    │     │   │
+    │  │     │                 │   sentiment, │     │   │
+    │  │     │                 │   injuries } │     │   │
+    │  │ 2   │ ferxxxa_intel   │ { ...prev... │     │   │
+    │  │ 3   │ other_topic     │ { ...data... │     │   │
+    │  └──────────────────────────────────────────────┘   │
+    └──────────────────────────────────────────────────────┘
+
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                    LAYER 2: USER REQUEST PROCESSING                           │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+    ┌──────────────────────────┐
+    │   USER REQUEST           │
+    │  "¿Qué apuesto?"         │
+    │                          │
+    │ POST /api/chat           │
+    │ {                        │
+    │   message: "...",        │
+    │   session_id: "...",     │
+    │   bankroll: 25000,       │
+    │   language: "es"         │
+    │ }                        │
+    └──────────┬───────────────┘
+               │
+               ▼
+    ┌──────────────────────────────────────────┐
+    │  1. Load conversation history            │
+    │     SELECT FROM conversation_history     │
+    └──────────────────────────────────────────┘
+               │
+               ▼
+    ┌──────────────────────────────────────────┐
+    │  2. INTEGRATION POINT ⭐ FETCH FerXxxa    │
+    │                                          │
+    │  SELECT summary_json, studied_at         │
+    │  FROM zak_intel                          │
+    │  WHERE topic = 'ferxxxa_intel'           │
+    │  AND studied_at > NOW() - 4 hours        │
+    │  ORDER BY studied_at DESC                │
+    │  LIMIT 1                                 │
+    │                                          │
+    │  Result: ferxxxaIntel = {                │
+    │    match_predictions: {...},             │
+    │    sentiment_analysis: {...},            │
+    │    injury_alerts: [...],                 │
+    │    trending_narratives: [...]            │
+    │  }                                       │
+    └──────────────────────────────────────────┘
+               │
+               ▼
+    ┌──────────────────────────────────────────┐
+    │  3. Build System Prompt with FerXxxa     │
+    │                                          │
+    │  userContext += `                        │
+    │    FERXXXA DORADOBET INTELLIGENCE:       │
+    │    • Narratives: Argentina form, ...     │
+    │    • Sentiment: 82+ / 34- messages       │
+    │    • Injuries: Mbappé (questionable)     │
+    │    • Freshness: 35 minutes old           │
+    │    • Use for: validate, detect arb       │
+    │  `                                       │
+    │                                          │
+    │  systemPrompt = SYSTEM_PROMPTS.es        │
+    │    .replace('{USER_CONTEXT}', ...)       │
+    └──────────────────────────────────────────┘
+               │
+               ▼
+    ┌──────────────────────────────────────────┐
+    │  4. Call Groq LLM with Context           │
+    │                                          │
+    │  groq.chat.completions.create({          │
+    │    model: 'llama-3.3-70b-versatile',    │
+    │    messages: [                           │
+    │      { role: 'system', content: ... },   │
+    │      { role: 'user', content: ... }      │
+    │    ],                                    │
+    │    response_format: 'json_object'        │
+    │  })                                      │
+    │                                          │
+    │  ▶ Groq now knows about:                 │
+    │    - User bankroll & Kelly rules         │
+    │    - FerXxxa community predictions       │
+    │    - DoradoBet chat sentiment            │
+    │    - Community injury alerts             │
+    └──────────────────────────────────────────┘
+               │
+               ▼
+    ┌──────────────────────────────────────────┐
+    │  5. Parse JSON Response                  │
+    │                                          │
+    │  groqOutput = {                          │
+    │    reasoning_chain: [...],               │
+    │    analysis: "text",                     │
+    │    recommendations: [...],               │
+    │    kelly_calculations: {                 │
+    │      bet_1: {                            │
+    │        amount_colones: 8500,             │
+    │        kelly_percentage: 12.8,           │
+    │        ferxxxa_context: {                │
+    │          doradobet_consensus: "...",     │
+    │          consensus_matches: true         │
+    │        }                                 │
+    │      }                                   │
+    │    }                                     │
+    │  }                                       │
+    └──────────────────────────────────────────┘
+               │
+               ▼
+    ┌──────────────────────────────────────────┐
+    │  6. Store in Conversation History        │
+    │                                          │
+    │  INSERT INTO conversation_history        │
+    │    (session_id, user_message, ...)       │
+    └──────────────────────────────────────────┘
+               │
+               ▼
+    ┌──────────────────────────────────────────┐
+    │  7. Return Response to User              │
+    │                                          │
+    │  {                                       │
+    │    success: true,                        │
+    │    response: "Recomiendo Over 2.5...",   │
+    │    reasoning_chain: [...],               │
+    │    recommendations: [...],               │
+    │    kelly_calculations: {...},            │
+    │    data_sources_used: [                  │
+    │      "FBREF", "Understat",               │
+    │      "API-Football", "FerXxxa" ⭐        │
+    │    ],                                    │
+    │    ferxxxa_intel: {                      │
+    │      available: true,                    │
+    │      age_minutes: 35,                    │
+    │      data_freshness: "fresh"             │
+    │    }                                     │
+    │  }                                       │
+    └──────────────────────────────────────────┘
+
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                  LAYER 3: HOW IA-ZAK USES FerXxxa DATA                        │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+    ┌──────────────────────────────────────────────────────────┐
+    │ SCENARIO 1: Community Agrees with Analysis              │
+    │                                                          │
+    │ IA-Zak calculates: Over 2.5 = 68% probability           │
+    │ FerXxxa shows:    45% of DoradoBet users also picked it │
+    │                                                          │
+    │ Result: ✅ CONFIDENCE BOOST                              │
+    │ Recommendation: "Over 2.5 a ₡8,500 (Kelly 12.8%)"       │
+    │ Note: "Community consensus validates my analysis"        │
+    └──────────────────────────────────────────────────────────┘
+
+    ┌──────────────────────────────────────────────────────────┐
+    │ SCENARIO 2: Community Diverges (Arbitrage Detected)     │
+    │                                                          │
+    │ IA-Zak calculates: Argentina Win = 52% probability      │
+    │ FerXxxa shows:    Only 28% of users picked Argentina    │
+    │                                                          │
+    │ Result: ⚠️ POTENTIAL ARBITRAGE                            │
+    │ Recommendation: "Argentina Win a ₡6,200 (Kelly 8.5%)"   │
+    │ Note: "Community undervaluing Argentina but..."          │
+    │       "Data supports my divergence because..."           │
+    └──────────────────────────────────────────────────────────┘
+
+    ┌──────────────────────────────────────────────────────────┐
+    │ SCENARIO 3: Injury Update from Community                │
+    │                                                          │
+    │ FerXxxa reports: "Mbappé reported_questionable (12 refs)"│
+    │ IA-Zak incorporates: Reduces probability by 2-3%        │
+    │                                                          │
+    │ Result: 📍 INFORMED ADJUSTMENT                           │
+    │ Recommendation: "...adjusted for Mbappé uncertainty..."  │
+    │ Note: "Community already pricing this in"                │
+    └──────────────────────────────────────────────────────────┘
+
+    ┌──────────────────────────────────────────────────────────┐
+    │ SCENARIO 4: FerXxxa Data Unavailable                    │
+    │                                                          │
+    │ No FerXxxa data found (> 4 hours old)                   │
+    │                                                          │
+    │ Result: ✓ GRACEFUL DEGRADATION                           │
+    │ IA-Zak continues with technical analysis only           │
+    │ Note: "Community context unavailable"                    │
+    │ ferxxxa_intel: { available: false, ... }                 │
+    └──────────────────────────────────────────────────────────┘
+
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                         KEY COMPONENTS SUMMARY                                │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+📍 FerXxxa (Agent 2):
+   • Endpoint: /api/ferxxxa-intel
+   • Schedule: Every 3 hours (0 */3 * * *)
+   • Input: DoradoBet chat data
+   • Output: Trends, sentiment, injuries, odds movement
+   • Storage: zak_intel table
+
+⚙️ IA-Zak Integration (Agent 3):
+   • Endpoint: /api/chat (modified)
+   • Integration: Lines 306-370 (2.1 section)
+   • Query: Fetches FerXxxa intel before Groq call
+   • Injection: Appends FerXxxa context to system prompt
+   • Output: Includes ferxxxa_intel metadata + ferxxxa_context in Kelly
+
+📊 Data Freshness Levels:
+   ✅ Fresh:  < 60 minutes old
+   ✅ Recent: 60-180 minutes old
+   ⚠️ Aging:  180-240 minutes old
+   ❌ Stale:  > 240 minutes (excluded)
+
+🔄 Cron Configuration:
+   vercel.json:
+   - /api/learn: 0 6 * * * (daily)
+   - /api/ferxxxa-intel: 0 */3 * * * (every 3 hours)
+
+💾 Database:
+   Table: zak_intel (already exists)
+   Topic: 'ferxxxa_intel'
+   Fields: summary_json (JSONB), studied_at (timestamp)
+
+🚀 No Breaking Changes:
+   - chat.js: 1 new section (2.1)
+   - vercel.json: 1 new cron entry
+   - No new tables created
+   - All other endpoints unchanged
+
+
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                              QUICK REFERENCE                                 ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+When User Asks IA-Zak for Betting Advice:
+
+  Step 1: Load chat history
+  Step 2: 🔗 FETCH FerXxxa intel from DB (age < 4 hours)
+  Step 3: Build system prompt with FerXxxa context
+  Step 4: Call Groq LLM (now aware of community predictions)
+  Step 5: Parse JSON response
+  Step 6: Store conversation
+  Step 7: Return recommendation + ferxxxa_intel metadata
+
+Result: User gets community-aware betting recommendations
+        validated against DoradoBet sentiment and predictions
+
+✨ Integration Status: COMPLETE & OPERATIONAL

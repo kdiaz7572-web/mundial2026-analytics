@@ -1,0 +1,243 @@
+{
+  "success": true,
+  "timestamp": "2026-05-25T14:32:00Z",
+  "source": "doradobet_live",
+  "data_persisted": true,
+  "community_analysis": {
+    "topic": "ferxxxa_community",
+    "total_chat_messages": 500,
+    "analyzed_messages": 234,
+    "analysis_window_minutes": 30,
+    "community_parlays": [
+      {
+        "parlay_name": "over_2_5_goals + btts_yes",
+        "events": [
+          "over_2_5_goals",
+          "btts_yes"
+        ],
+        "frequency": 67,
+        "percentage": 28.6,
+        "sentiment": {
+          "positive": 55,
+          "negative": 2,
+          "neutral": 10,
+          "dominant": "very_positive"
+        },
+        "trending": "strongly_up",
+        "mentioned_odds": 2.89,
+        "real_odds": 2.88,
+        "arbitrage_opportunity": false,
+        "unique_users": 34
+      },
+      {
+        "parlay_name": "home_win + over_2_5_goals",
+        "events": [
+          "home_win",
+          "over_2_5_goals"
+        ],
+        "frequency": 45,
+        "percentage": 19.2,
+        "sentiment": {
+          "positive": 32,
+          "negative": 4,
+          "neutral": 9,
+          "dominant": "positive"
+        },
+        "trending": "up",
+        "mentioned_odds": 3.25,
+        "real_odds": 3.41,
+        "arbitrage_opportunity": false,
+        "unique_users": 28
+      },
+      {
+        "parlay_name": "home_win + btts_yes",
+        "events": [
+          "home_win",
+          "btts_yes"
+        ],
+        "frequency": 38,
+        "percentage": 16.2,
+        "sentiment": {
+          "positive": 28,
+          "negative": 3,
+          "neutral": 7,
+          "dominant": "positive"
+        },
+        "trending": "stable",
+        "mentioned_odds": 3.55,
+        "real_odds": 3.72,
+        "arbitrage_opportunity": false,
+        "unique_users": 22
+      },
+      {
+        "parlay_name": "over_3_5_goals + btts_yes",
+        "events": [
+          "over_3_5_goals",
+          "btts_yes"
+        ],
+        "frequency": 32,
+        "percentage": 13.7,
+        "sentiment": {
+          "positive": 24,
+          "negative": 5,
+          "neutral": 3,
+          "dominant": "positive"
+        },
+        "trending": "up",
+        "mentioned_odds": 4.50,
+        "real_odds": 4.65,
+        "arbitrage_opportunity": false,
+        "unique_users": 18
+      },
+      {
+        "parlay_name": "under_5_cards + home_win",
+        "events": [
+          "under_5_cards",
+          "home_win"
+        ],
+        "frequency": 28,
+        "percentage": 12.0,
+        "sentiment": {
+          "positive": 19,
+          "negative": 2,
+          "neutral": 7,
+          "dominant": "positive"
+        },
+        "trending": "stable",
+        "mentioned_odds": 2.75,
+        "real_odds": 2.88,
+        "arbitrage_opportunity": false,
+        "unique_users": 16
+      },
+      {
+        "parlay_name": "filip_goal + over_2_5_goals",
+        "events": [
+          "filip_goal",
+          "over_2_5_goals"
+        ],
+        "frequency": 18,
+        "percentage": 7.7,
+        "sentiment": {
+          "positive": 14,
+          "negative": 1,
+          "neutral": 3,
+          "dominant": "positive"
+        },
+        "trending": "down",
+        "mentioned_odds": 2.50,
+        "real_odds": 2.65,
+        "arbitrage_opportunity": false,
+        "unique_users": 11
+      }
+    ],
+    "sentiment_analysis": {
+      "total_positive": 172,
+      "total_negative": 17,
+      "total_neutral": 45,
+      "overall_sentiment": "positive",
+      "confidence": 0.76
+    },
+    "consensus_bet": {
+      "parlay_name": "over_2_5_goals + btts_yes",
+      "frequency": 67,
+      "consensus_strength": "strong"
+    },
+    "market_correlation_from_chat": {
+      "home_win": {
+        "over_2_5_goals": 0.72,
+        "btts_yes": 0.54,
+        "over_3_5_goals": 0.38,
+        "under_5_cards": 0.45
+      },
+      "over_2_5_goals": {
+        "home_win": 0.72,
+        "btts_yes": 0.68,
+        "over_3_5_goals": 0.42,
+        "filip_goal": 0.25
+      },
+      "btts_yes": {
+        "over_2_5_goals": 0.68,
+        "home_win": 0.54,
+        "over_3_5_goals": 0.51,
+        "corners_over": 0.35
+      },
+      "over_3_5_goals": {
+        "btts_yes": 0.51,
+        "over_2_5_goals": 0.42,
+        "home_win": 0.38,
+        "corners_over": 0.48
+      },
+      "under_5_cards": {
+        "home_win": 0.45,
+        "btts_yes": 0.32,
+        "over_2_5_goals": 0.28
+      },
+      "filip_goal": {
+        "over_2_5_goals": 0.25,
+        "btts_yes": 0.18
+      }
+    },
+    "player_mentions": {
+      "filip_bilbija": {
+        "mentions": 18,
+        "sentiment": "positive",
+        "goals_odds": 2.50
+      },
+      "stefano_marino": {
+        "mentions": 9,
+        "sentiment": "neutral",
+        "goals_odds": 4.00
+      },
+      "maximilian_philipp": {
+        "mentions": 7,
+        "sentiment": "positive",
+        "goals_odds": 3.75
+      },
+      "bartol_franjic": {
+        "mentions": 5,
+        "sentiment": "positive",
+        "goals_odds": 4.50
+      }
+    },
+    "arbitrage_opportunities": [
+      {
+        "parlay": "over_2_5_goals + btts_yes",
+        "community_odds": 2.89,
+        "real_odds": 3.05,
+        "difference": 0.16,
+        "percent_difference": 5.5,
+        "advantage": "community_undervaluing",
+        "recommendation": "Take real odds, avoid community consensus",
+        "note": "Community slightly undervaluing. Real odds 5.5% better",
+        "arbitrage_opportunity": true
+      },
+      {
+        "parlay": "under_5_cards + home_win",
+        "community_odds": 2.75,
+        "real_odds": 2.88,
+        "difference": 0.13,
+        "percent_difference": 4.7,
+        "advantage": "community_undervaluing",
+        "recommendation": "Take real odds, avoid community consensus",
+        "note": "Community slightly undervaluing. Real odds 4.7% better",
+        "arbitrage_opportunity": true
+      },
+      {
+        "parlay": "home_win + over_2_5_goals",
+        "community_odds": 3.25,
+        "real_odds": 3.41,
+        "difference": 0.16,
+        "percent_difference": 4.9,
+        "advantage": "community_undervaluing",
+        "recommendation": "Take real odds, avoid community consensus",
+        "note": "Community slightly undervaluing. Real odds 4.9% better",
+        "arbitrage_opportunity": true
+      }
+    ],
+    "data_quality": {
+      "messages_analyzed": 234,
+      "extraction_timestamp": "2026-05-25T14:32:00Z",
+      "confidence_level": "high"
+    }
+  }
+}

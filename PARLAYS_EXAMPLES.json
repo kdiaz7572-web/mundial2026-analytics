@@ -1,0 +1,386 @@
+{
+  "example_1_conservative": {
+    "query": "¿Cuál es la mejor combinada para Argentina vs Francia?",
+    "bankroll": 50000,
+    "language": "es",
+    "response": {
+      "reasoning_chain": [
+        "Paso 1: Entiendo - Preguntas sobre partido Argentina vs Francia. Necesito analizar ambos equipos.",
+        "Paso 2: Busco datos - FBREF (forma última 5 partidos), Understat (xG), Transfermarkt (lesiones), API-Football (posición tabla)",
+        "Paso 3: Conflictos - Datos de Understat vs FBREF tienen ligera diferencia en xG promedio. Understat más actualizado (2h atrás).",
+        "Paso 4: Calculo probabilidades - Poisson base: Argentina 55% win, Francia 25% win, 20% draw. Ajuste por xG: Argentina 1.8 xG, Francia 0.9 xG. Final: Argentina 65% win, Over 2.5 60%, BTTS 58%",
+        "Paso 5: Kelly para parciales - Argentina Win: kelly=4.8%, Over: kelly=6.2%, BTTS: kelly=3.9%. Para parlays: 3-5 opciones con perfiles riesgo variados.",
+        "Paso 6: Síntesis - Recomendación: 3 parlays (conservador/moderado/agresivo) con correlaciones ajustadas. FerXxxa menciona 46% apuesta Over+BTTS, que es correlación positiva."
+      ],
+      "analysis": "Argentina llega con forma excelente (W-W-D) según [FBREF]. Understat dice xG=1.8 vs Francia xG=0.9. Es clara favorita pero Francia defensivamente sólida. Esto sugiere: alta probabilidad de Argentina win (65%) pero goles controlados. BTTS menos probable (58%) porque defensa Francia es fuerte. Para parlays, la clave es entender correlaciones: si Argentina gana, probablemente haya >2.5 goles (correlación positiva 0.62), pero BTTS menos ligado a win argentino (correlación 0.45). FerXxxa Intel muestra comunidad apostando 46% 'Over + BTTS' (estrategia de correlación positiva fuerte), 35% 'Home + Under' (anti-correlación), resto scattered. Nuestro análisis diverge ligeramente: vemos más valor en 'Home + BTTS' que en 'Home + Over' puro.",
+      "data_sources_used": ["FBREF", "Understat", "API-Football", "Transfermarkt", "FerXxxa"],
+      "uncertainties": ["Estado físico de Mbappé no confirmado (chat FerXxxa menciona posible molestia)", "Datos Understat tienen 2 horas"],
+      "confidence": "high",
+      "recommendations": [
+        "Pick 1: Argentina Win (1x2) con 65% probabilidad - Kelly 4.8%, ₡2,400",
+        "Pick 2: Over 2.5 goles con 60% probabilidad - Kelly 6.2%, ₡3,100",
+        "Pick 3: BTTS Yes con 58% probabilidad - Kelly 3.9%, ₡1,950"
+      ],
+      "kelly_calculations": {
+        "bet_1": {
+          "amount_colones": 2400,
+          "kelly_percentage": 4.8,
+          "bet_type": "1x2",
+          "reasoning": "Argentina forma excelente [FBREF: W-W-D]. Understat xG 1.8 vs 0.9 Francia. Odds 1.75 undervalúan esta diferencia. Edge = (0.65×1.75)-1 = 0.1375 = 13.75%",
+          "probability": 0.65,
+          "odds": 1.75,
+          "edge": 0.1375,
+          "risk_of_ruin": 1.2,
+          "ferxxxa_context": {
+            "doradobet_consensus": "Argentina Win 68% apostadores (ligera sobre-estimación)",
+            "consensus_matches_our_pick": true,
+            "confidence_adjustment": "Sin ajuste - sentimiento muy positivo, pero odds también reflejan esto"
+          }
+        },
+        "warnings": ["Kelly total recomendado (3 picks simples): 14.9% del bankroll = ₡7,450"]
+      },
+      "recommended_parlays": [
+        {
+          "name": "Conservador - Argentina Win + Under 2.5",
+          "events": [
+            {
+              "market": "1x2",
+              "prediction": "home_win",
+              "probability": 0.65,
+              "odds": 1.75
+            },
+            {
+              "market": "over_under",
+              "prediction": "under_2.5",
+              "probability": 0.40,
+              "odds": 1.95
+            }
+          ],
+          "combined_probability": 0.26,
+          "combined_odds": 3.41,
+          "correlation_adjustment": "0.85x (negative correlation - if Argentina wins strongly, more likely >2.5)",
+          "kelly_percentage": 3.8,
+          "bankroll_amount_colones": 1900,
+          "risk_profile": "conservative",
+          "reasoning": "Esta combinada es contraintuitiva pero valiosa. Argentina favorita para ganar, pero probabilidad baja de >2.5 goles dado que Francia defensiva. La correlación negativa (win argentina puede ir acompañado de muchos goles o pocos) hace que esta combinada sea EQUILIBRADA. Comunitad apuesta algo similar (FerXxxa: 35% apostadores). Odds 3.41 dan expected value positivo incluso si estimamos 26% probabilidad (paga 3.41 / 26% = 1.31 veces bankroll). MEJOR OPCIÓN para bankroll conservador."
+        },
+        {
+          "name": "Moderado - Argentina Win + Over 2.5 + BTTS",
+          "events": [
+            {
+              "market": "1x2",
+              "prediction": "home_win",
+              "probability": 0.65,
+              "odds": 1.75
+            },
+            {
+              "market": "over_under",
+              "prediction": "over_2.5",
+              "probability": 0.60,
+              "odds": 1.85
+            },
+            {
+              "market": "btts",
+              "prediction": "yes",
+              "probability": 0.58,
+              "odds": 1.92
+            }
+          ],
+          "combined_probability": 0.226,
+          "combined_odds": 6.17,
+          "correlation_adjustment": "0.95x (high positive correlation - all three events require offensive play)",
+          "kelly_percentage": 6.8,
+          "bankroll_amount_colones": 3400,
+          "risk_profile": "moderate",
+          "reasoning": "Si Argentina gana AND hay >2.5 goles, entonces BTTS es muy probable (88% probabilidad condicional). Esta combinada asume PARTIDO OFENSIVO donde Argentina domina y ambos anotan. Correlación positiva fuerte (0.95) porque los tres eventos se refuerzan. Probabilidad combinada 22.6% son odds 6.17 = buen valor. FerXxxa dice comunidad 46% apuesta 'Over+BTTS' (similar a esta, sin el Win específico). Kelly 6.8% es balanceado para perfil moderado. EQUILIBRIO RIESGO-RECOMPENSA."
+        },
+        {
+          "name": "Agresivo - Argentina Win + Over 2.5 + BTTS + Corners > 10",
+          "events": [
+            {
+              "market": "1x2",
+              "prediction": "home_win",
+              "probability": 0.65,
+              "odds": 1.75
+            },
+            {
+              "market": "over_under",
+              "prediction": "over_2.5",
+              "probability": 0.60,
+              "odds": 1.85
+            },
+            {
+              "market": "btts",
+              "prediction": "yes",
+              "probability": 0.58,
+              "odds": 1.92
+            },
+            {
+              "market": "corners",
+              "prediction": "over_10",
+              "probability": 0.62,
+              "odds": 1.88
+            }
+          ],
+          "combined_probability": 0.14,
+          "combined_odds": 11.87,
+          "correlation_adjustment": "1.08x (very high positive correlation - all events linked to open, attacking match)",
+          "kelly_percentage": 10.2,
+          "bankroll_amount_colones": 5100,
+          "risk_profile": "aggressive",
+          "reasoning": "Scenario: PARTIDO ABIERTO Y EMOCIONANTE donde Argentina domina, ambos anotan, >2.5 goles totales, y muchos corners (indicador de presión ofensiva). Correlación positiva 1.08 porque todos los eventos se refuerzan (partido emocionante = todos suceden juntos). Probabilidad 14% es baja pero odds 11.87 dan payout bueno si sucede. Expected Value = (0.14 × 11.87) - 1 = 0.66 = 66% ROI positivo. Kelly 10.2% agresivo pero justificado. SOLO si crees en partido ofensivo alta intensidad. FerXxxa no menciona muchos apostadores en 'cuatro eventos' pero sí mucho sentimiento positivo sobre Argentina ofensivamente."
+        }
+      ]
+    }
+  },
+  "example_2_match_balanced": {
+    "query": "Bet recommendation for Spain vs Germany match",
+    "bankroll": 30000,
+    "language": "en",
+    "response": {
+      "reasoning_chain": [
+        "Step 1: Understanding - You ask about Spain vs Germany. Need to analyze both teams' current form.",
+        "Step 2: Data gathering - FBREF (last 5 matches: Spain W-W-D-L-W), Understat (xG Spain 1.5, Germany 1.3), Transfermarkt (No major injuries reported)",
+        "Step 3: Conflicts - Different sources show close match: FBREF suggests Spain slight edge (form), Understat shows balanced xG",
+        "Step 4: Calculating probabilities - Poisson + adjustments: Spain 48% win, Draw 28%, Germany 24%. Over 2.5: 55%. BTTS: 52%",
+        "Step 5: Kelly calculations - Spain Win kelly=3.2%, Draw kelly=5.1%, Germany Win kelly=2.8%. For parlays: need to balance correlation",
+        "Step 6: Synthesis - Three parlay options reflecting uncertainty. Community (FerXxxa) shows no strong consensus - good sign to maintain confidence"
+      ],
+      "analysis": "Spain shows solid form [FBREF: W-W-D-L-W in last 5] but Germany equally dangerous defensively. Understat xG nearly identical (Spain 1.5 vs Germany 1.3) suggests BALANCED match. This is NOT a clear favorite situation like Argentina. For balanced matches, correlation becomes critical: Draw + Under appeals to conservative bettors, Spain Win + Over appeals to offensive-play believers. BTTS is 52% probable - good indicator of competitive equilibrium. FerXxxa shows split opinion (no consensus) which validates our 'uncertainty but balanced' assessment.",
+      "data_sources_used": ["FBREF", "Understat", "API-Football", "Transfermarkt", "FerXxxa"],
+      "uncertainties": ["Exact team selection not confirmed yet", "Weather conditions could favor Germany's pace"],
+      "confidence": "medium - balanced match with no clear edge",
+      "recommendations": [
+        "Pick 1: Draw with 28% probability - Kelly 5.1%, ₡1,530",
+        "Pick 2: Over 2.5 with 55% probability - Kelly 6.2%, ₡1,860",
+        "Pick 3: BTTS Yes with 52% probability - Kelly 4.8%, ₡1,440"
+      ],
+      "kelly_calculations": {
+        "bet_1": {
+          "amount_colones": 1530,
+          "kelly_percentage": 5.1,
+          "bet_type": "draw",
+          "reasoning": "Balanced xG (Spain 1.5, Germany 1.3) and form suggests Draw has value. Odds 3.60 undervalue 28% probability. Edge = (0.28×3.60)-1 = 0.008 = 0.8%",
+          "probability": 0.28,
+          "odds": 3.60,
+          "edge": 0.008,
+          "risk_of_ruin": 1.8,
+          "ferxxxa_context": {
+            "doradobet_consensus": "Spain slightly favored (55%) vs Draw (25%) in community sentiment",
+            "consensus_matches_our_pick": false,
+            "confidence_adjustment": "Slight downward - community prefers Spain, but odds don't support overweighting this"
+          }
+        },
+        "warnings": ["Balanced match = higher uncertainty. Consider lower Kelly percentages if risk-averse"]
+      },
+      "recommended_parlays": [
+        {
+          "name": "Conservative - Draw + Under 2.5",
+          "events": [
+            {
+              "market": "1x2",
+              "prediction": "draw",
+              "probability": 0.28,
+              "odds": 3.60
+            },
+            {
+              "market": "over_under",
+              "prediction": "under_2.5",
+              "probability": 0.45,
+              "odds": 1.90
+            }
+          ],
+          "combined_probability": 0.126,
+          "combined_odds": 6.84,
+          "correlation_adjustment": "0.88x (negative correlation - draw often means defensive, <2.5)",
+          "kelly_percentage": 3.2,
+          "bankroll_amount_colones": 960,
+          "risk_profile": "conservative",
+          "reasoning": "Appeals to defensive-match believers. If match is defensive draw, BOTH events occur together. Negative correlation adjustment (0.88) reflects that these events are somewhat linked. Very safe parlay for low-risk profile. Moderate odds (6.84) won't bankrupt you, but won't make you rich either."
+        },
+        {
+          "name": "Moderate - Spain Win + Over 2.5",
+          "events": [
+            {
+              "market": "1x2",
+              "prediction": "home_win",
+              "probability": 0.48,
+              "odds": 2.10
+            },
+            {
+              "market": "over_under",
+              "prediction": "over_2.5",
+              "probability": 0.55,
+              "odds": 1.82
+            }
+          ],
+          "combined_probability": 0.264,
+          "combined_odds": 3.82,
+          "correlation_adjustment": "0.92x (moderate positive correlation - Spain dominance = more goals)",
+          "kelly_percentage": 5.5,
+          "bankroll_amount_colones": 1650,
+          "risk_profile": "moderate",
+          "reasoning": "Spain favored slightly by form but not by xG. This parlay assumes Spain wins AND game is open (>2.5). Moderate positive correlation (0.92) because if Spain dominates, likely more goals. Expected value good: 26.4% probability × 3.82 odds = 1.01 payout (essentially break-even + small edge). Best for balanced-risk bettors."
+        },
+        {
+          "name": "Aggressive - Spain Win + Over 2.5 + BTTS + Corners > 9",
+          "events": [
+            {
+              "market": "1x2",
+              "prediction": "home_win",
+              "probability": 0.48,
+              "odds": 2.10
+            },
+            {
+              "market": "over_under",
+              "prediction": "over_2.5",
+              "probability": 0.55,
+              "odds": 1.82
+            },
+            {
+              "market": "btts",
+              "prediction": "yes",
+              "probability": 0.52,
+              "odds": 1.95
+            },
+            {
+              "market": "corners",
+              "prediction": "over_9",
+              "probability": 0.58,
+              "odds": 1.85
+            }
+          ],
+          "combined_probability": 0.127,
+          "combined_odds": 13.86,
+          "correlation_adjustment": "1.06x (high positive correlation - open attacking game)",
+          "kelly_percentage": 8.8,
+          "bankroll_amount_colones": 2640,
+          "risk_profile": "aggressive",
+          "reasoning": "Scenario: Open, attacking match where Spain dominates, both teams score, >2.5 goals, >9 corners (sign of open play). All events linked. Probability 12.7% is low but odds 13.86 give payout. Expected value = (0.127 × 13.86) - 1 = 0.76 = 76% ROI if you believe in this scenario. Kelly 8.8% aggressive but justified. Risk: if game is defensive or Germany sits back, parlay fails. FerXxxa shows community split, which means YOUR prediction (open game) is not consensus - possible arbitrage."
+        }
+      ]
+    }
+  },
+  "example_3_underdog": {
+    "query": "¿Qué apuestas sobre Portugal vs Holanda?",
+    "bankroll": 25000,
+    "language": "es",
+    "response": {
+      "reasoning_chain": [
+        "Paso 1: Entiendo - Portugal vs Holanda. Necesito evaluar underdog (Portugal) vs favorito (Holanda).",
+        "Paso 2: Datos - FBREF: Holanda forma W-W-D (superior). Understat: Holanda xG 1.7, Portugal xG 1.2 (diferencia clara).",
+        "Paso 3: Conflictos - Ambas fuentes confirman Holanda favorita. No conflictos de datos.",
+        "Paso 4: Probabilidades - Holanda 58% win, Draw 26%, Portugal 16%. Over 2.5: 48%. BTTS: 45%.",
+        "Paso 5: Kelly - Holanda Win kelly=6.1%, Draw kelly=4.2%, Portugal Win kelly=8.5% (alto riesgo). Underdog requiere análisis especial.",
+        "Paso 6: Síntesis - Holanda clara favorita. Parlays deben aprovechar: (a) valor en Portugal underdog si apuestas combinadas, (b) Portugal + BTTS como hedge ofensivo, (c) Holanda + Under como safe."
+      ],
+      "analysis": "Holanda es FAVORITA clara según todos indicadores [FBREF: W-W-D forma, Understat xG 1.7 vs 1.2]. Portugal debería pagar odds mejores en moneyline pero comunidad probablemente también ve a Holanda favorita. Esto crea oportunidad: parlays que incluyan Portugal ganan MÁS si suceden, porque tienen menos probabilidad. BTTS tiene 45% - relativamente bajo porque diferencia ofensiva Holanda es significativa. FerXxxa probablemente muestra mayoría apostando Holanda puro. Nuestra recomendación: si crees Portugal puede sorprender, parlay Portugal+BTTS+Over da payout alto (riesgo-recompensa asimétrico). Si eres conservador: Holanda+Under es la 'apuesta segura'.",
+      "data_sources_used": ["FBREF", "Understat", "API-Football", "Transfermarkt", "FerXxxa"],
+      "uncertainties": ["Disponibilidad de Neymar en Portugal no confirmada (lesión anterior)", "Datos Holanda pueden no reflejar rotaciones esperadas"],
+      "confidence": "medium-high - Holanda favorita pero Portugal tiene opciones",
+      "recommendations": [
+        "Pick 1: Holanda Win (1x2) con 58% probabilidad - Kelly 6.1%, ₡1,525",
+        "Pick 2: Portugal Win (underdog) con 16% probabilidad - Kelly 8.5%, ₡2,125 (ALTO RIESGO)",
+        "Pick 3: BTTS No (menos goles) con 55% probabilidad - Kelly 5.2%, ₡1,300"
+      ],
+      "kelly_calculations": {
+        "bet_1": {
+          "amount_colones": 1525,
+          "kelly_percentage": 6.1,
+          "bet_type": "1x2",
+          "reasoning": "Holanda clara favorita. xG 1.7 vs 1.2 Portugal indica diferencia real. Odds 1.65 son atractivas. Edge = (0.58×1.65)-1 = -0.043 (negativo, pero pequeño). Aún apuesta válida como pick principal.",
+          "probability": 0.58,
+          "odds": 1.65,
+          "edge": -0.043,
+          "risk_of_ruin": 2.1,
+          "ferxxxa_context": {
+            "doradobet_consensus": "Holanda 72% apostadores (sobre-estimación probable dada odds)",
+            "consensus_matches_our_pick": true,
+            "confidence_adjustment": "Reducir Kelly 10% porque mercado claramente favorece Holanda. Utilizar Fractional Kelly = 3% en lugar de 6%"
+          }
+        },
+        "warnings": ["⚠️ Portugal Win tiene kelly 8.5% (ALTO) - es apuesta underdog arriesgada. Fractional Kelly = 4.25%", "⚠️ Si apostaste Holanda + Portugal juntos = conflicto. Elige parlay OR picks simples separados"]
+      },
+      "recommended_parlays": [
+        {
+          "name": "Conservador - Holanda Win + Under 2.5",
+          "events": [
+            {
+              "market": "1x2",
+              "prediction": "home_win",
+              "probability": 0.58,
+              "odds": 1.65
+            },
+            {
+              "market": "over_under",
+              "prediction": "under_2.5",
+              "probability": 0.52,
+              "odds": 1.90
+            }
+          ],
+          "combined_probability": 0.302,
+          "combined_odds": 3.14,
+          "correlation_adjustment": "0.90x (negative correlation - Holanda dominancia puede venir con 3-4 goles)",
+          "kelly_percentage": 4.8,
+          "bankroll_amount_colones": 1200,
+          "risk_profile": "conservative",
+          "reasoning": "La apuesta 'segura'. Holanda gana pero sin goleada. Odds 3.14 para 30% probabilidad dan payout razonable. Correlación negativa (0.90) porque si Holanda domina, es MÁS probable >2.5 goles (pero no garantizado). Esta combinada captura 'Holanda eficiente en defensa' vs 'Holanda goleadora'. FerXxxa menciona mayoría apuesta Holanda, pero 'Holanda+Under' es MENOS popular (menos goleada), así que posible valor."
+        },
+        {
+          "name": "Moderado - Holanda Win + Over 2.5",
+          "events": [
+            {
+              "market": "1x2",
+              "prediction": "home_win",
+              "probability": 0.58,
+              "odds": 1.65
+            },
+            {
+              "market": "over_under",
+              "prediction": "over_2.5",
+              "probability": 0.48,
+              "odds": 1.88
+            }
+          ],
+          "combined_probability": 0.278,
+          "combined_odds": 3.10,
+          "correlation_adjustment": "0.96x (slight positive correlation - Holanda win often = many goals)",
+          "kelly_percentage": 5.2,
+          "bankroll_amount_colones": 1300,
+          "risk_profile": "moderate",
+          "reasoning": "Asume GOLEADA. Si Holanda gana, probabilidad >2.5 goles es 48% (moderada). Odds 3.10 son similares a parlay anterior pero asume scenario diferente (más goles). Kelly 5.2% es seguro. FerXxxa probablemente favorece este (comunidad espera Holanda ofensiva), así que sentimiento positivo. Payout similar, pero risk perfil diferente."
+        },
+        {
+          "name": "Valor - Portugal Draw/Win + BTTS + Over 2.5",
+          "events": [
+            {
+              "market": "1x2",
+              "prediction": "portugal_draw_or_win",
+              "probability": 0.42,
+              "odds": 1.95
+            },
+            {
+              "market": "btts",
+              "prediction": "yes",
+              "probability": 0.45,
+              "odds": 1.98
+            },
+            {
+              "market": "over_under",
+              "prediction": "over_2.5",
+              "probability": 0.48,
+              "odds": 1.88
+            }
+          ],
+          "combined_probability": 0.082,
+          "combined_odds": 7.27,
+          "correlation_adjustment": "0.85x (negative - Portugal no-loss + BTTS + many goals = asume Portugal strong)",
+          "kelly_percentage": 7.9,
+          "bankroll_amount_colones": 1975,
+          "risk_profile": "aggressive",
+          "reasoning": "APUESTA CONTRARIAN. Asume Portugal sorprende (draw o mejor) Y ambos anotan AND >2.5 goles. Probabilidad baja (8.2%) pero odds altos (7.27) crean expected value: 8.2% × 7.27 = 0.60 payout (60% ROI). Esto es EL VALOR ASIMÉTRICO. Comunidad no apuesta esto porque Holanda favorita, pero si Portugal saca resultado positivo, esta parlay EXPLOTA. Kelly 7.9% agresivo pero justificado por probabilidad baja. Correlación negativa (0.85) porque events son algo contradictorios (si Portugal no pierde, típicamente defiende más = menos goles, PERO si hay BTTS, entonces sí hay goles)."
+        }
+      ]
+    }
+  }
+}

@@ -2,14 +2,19 @@
   "version": 2,
   "crons": [
     {
+      "path": "/api/ferxxxa-markets",
+      "schedule": "*/5 * * * *",
+      "description": "Real-time DoradoBet market scraper - runs every 5 minutes"
+    },
+    {
       "path": "/api/learn",
       "schedule": "0 6 * * *",
       "description": "Daily learning cycle - validates predictions"
     },
     {
-      "path": "/api/ferxxxa-intel",
-      "schedule": "0 */3 * * *",
-      "description": "FerXxxa DoradoBet chat monitor - runs every 3 hours"
+      "path": "/api/ferxxxa-community",
+      "schedule": "*/5 * * * *",
+      "description": "FerXxxa Community Intelligence - betting chat analysis every 5 minutes"
     }
   ]
 }

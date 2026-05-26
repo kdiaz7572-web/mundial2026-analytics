@@ -166,11 +166,16 @@ async function migrate(sql) {
     )
   `;
 
-  // ── Zak Intel — daily Perplexity research results ────
+  // ── Zak Intel — daily Perplexity research results + market data ────
   await sql`
     CREATE TABLE IF NOT EXISTS zak_intel (
       id           SERIAL PRIMARY KEY,
       topic        TEXT        NOT NULL,
+      match_id     TEXT,
+      home_team    TEXT,
+      away_team    TEXT,
+      current_score TEXT,
+      current_minute INTEGER,
       content      TEXT        NOT NULL,
       summary_json JSONB,
       studied_at   TIMESTAMPTZ DEFAULT NOW()

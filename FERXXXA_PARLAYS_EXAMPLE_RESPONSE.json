@@ -1,0 +1,233 @@
+{
+  "success": true,
+  "timestamp": "2026-05-25T14:30:00.000Z",
+  "source": "doradobet_live",
+  "data_persisted": true,
+  "ferxxxa_intel": {
+    "match_predictions": {
+      "total_chat_messages": 156,
+      "predictions": [
+        {
+          "bet_type": "1x2",
+          "prediction": "home_win",
+          "frequency": 42,
+          "percentage": 26.9
+        },
+        {
+          "bet_type": "1x2",
+          "prediction": "draw",
+          "frequency": 18,
+          "percentage": 11.5
+        },
+        {
+          "bet_type": "1x2",
+          "prediction": "away_win",
+          "frequency": 35,
+          "percentage": 22.4
+        },
+        {
+          "bet_type": "Over/Under",
+          "prediction": "over_2.5",
+          "frequency": 68,
+          "percentage": 43.6
+        },
+        {
+          "bet_type": "Over/Under",
+          "prediction": "under_2.5",
+          "frequency": 31,
+          "percentage": 19.9
+        },
+        {
+          "bet_type": "BTTS",
+          "prediction": "yes",
+          "frequency": 45,
+          "percentage": 28.8
+        },
+        {
+          "bet_type": "Corners",
+          "prediction": "over_9",
+          "frequency": 22,
+          "percentage": 14.1
+        },
+        {
+          "bet_type": "Yellow Cards",
+          "prediction": "over_5",
+          "frequency": 18,
+          "percentage": 11.5
+        }
+      ]
+    },
+    "odds_movement": {
+      "home_win": {
+        "3h_ago": 1.92,
+        "current": 1.88,
+        "change": -0.04,
+        "direction": "down"
+      },
+      "draw": {
+        "3h_ago": 3.45,
+        "current": 3.38,
+        "change": -0.07,
+        "direction": "down"
+      },
+      "away_win": {
+        "3h_ago": 3.95,
+        "current": 3.87,
+        "change": -0.08,
+        "direction": "down"
+      }
+    },
+    "injury_alerts": [
+      {
+        "player": "Kylian Mbappé",
+        "status": "reported_questionable",
+        "confidence": "medium",
+        "mentions": 12
+      },
+      {
+        "player": "Rodrygo",
+        "status": "reported_out",
+        "confidence": "high",
+        "mentions": 18
+      },
+      {
+        "player": "Lionel Messi",
+        "status": "reported_fit",
+        "confidence": "high",
+        "mentions": 5
+      }
+    ],
+    "sentiment_analysis": {
+      "positive_messages": 67,
+      "negative_messages": 34,
+      "neutral_messages": 55,
+      "overall_sentiment": "positive"
+    },
+    "trending_narratives": [
+      "Argentina strong recent form after Copa América",
+      "France's injury concerns could impact attack depth",
+      "Over 2.5 goals attractive value at current odds",
+      "Both teams' defensive records suggest scoring likely",
+      "Mbappé's fitness status is key market driver",
+      "First half under could provide value"
+    ],
+    "popular_parlays": [
+      {
+        "parlay_name": "Over 2.5 + BTTS",
+        "frequency": 27,
+        "percentage": 17.3,
+        "events": [
+          "over_2.5_goals",
+          "btts_yes"
+        ],
+        "implied_probability": 0.35,
+        "real_odds_if_available": 3.55,
+        "community_odds_reported": 3.4
+      },
+      {
+        "parlay_name": "Home Win + Under 2.5",
+        "frequency": 12,
+        "percentage": 7.7,
+        "events": [
+          "home_win",
+          "under_2.5_goals"
+        ],
+        "implied_probability": 0.29,
+        "real_odds_if_available": 3.67,
+        "community_odds_reported": 3.44
+      },
+      {
+        "parlay_name": "Home Win + BTTS + Over 2.5",
+        "frequency": 8,
+        "percentage": 5.1,
+        "events": [
+          "home_win",
+          "btts_yes",
+          "over_2.5_goals"
+        ],
+        "implied_probability": 0.21,
+        "real_odds_if_available": 6.49,
+        "community_odds_reported": 4.92
+      },
+      {
+        "parlay_name": "Over 2.5 + Corners > 9",
+        "frequency": 7,
+        "percentage": 4.5,
+        "events": [
+          "over_2.5_goals",
+          "corners_gt_9"
+        ],
+        "implied_probability": 0.24,
+        "real_odds_if_available": 3.89,
+        "community_odds_reported": 3.75
+      },
+      {
+        "parlay_name": "Home Win + Over 2.5",
+        "frequency": 14,
+        "percentage": 9.0,
+        "events": [
+          "home_win",
+          "over_2.5_goals"
+        ],
+        "implied_probability": 0.32,
+        "real_odds_if_available": 3.48,
+        "community_odds_reported": 3.42
+      }
+    ],
+    "market_correlations": {
+      "over_2_5_goals": {
+        "correlates_with": [
+          "btts_yes",
+          "corners_gt_9",
+          "yellow_cards_gt_5"
+        ],
+        "strength": [
+          0.72,
+          0.58,
+          0.41
+        ],
+        "reasoning": "More goals → both teams score + more action (corners/yellows)"
+      },
+      "home_win": {
+        "correlates_with": [
+          "over_2.5_goals",
+          "home_team_btts"
+        ],
+        "strength": [
+          0.65,
+          0.52
+        ],
+        "reasoning": "Strong home team → scoring both ways is likely"
+      },
+      "btts_yes": {
+        "correlates_with": [
+          "over_2.5_goals",
+          "corners_gt_9"
+        ],
+        "strength": [
+          0.72,
+          0.49
+        ],
+        "reasoning": "Both teams scoring → high goal count + more match action"
+      },
+      "under_2_5_goals": {
+        "correlates_with": [
+          "no_btts",
+          "low_corners"
+        ],
+        "strength": [
+          0.85,
+          0.7
+        ],
+        "reasoning": "Defensive match → fewer goals + less action overall"
+      }
+    },
+    "parlay_value_analysis": {
+      "most_mispriced": "Home Win + Under 2.5 (comunidad apuesta 3.44, valor real ~3.67)",
+      "consensus_bet": "Over 2.5 + BTTS (17.3% de apostadores apuesta algo similar)",
+      "contrarian_opportunity": "Over 2.5 + Corners > 9 (solo 4.5% apuesta, puede tener valor si fundamentals lo soportan)",
+      "analysis_timestamp": "2026-05-25T14:30:00.000Z",
+      "methodology": "Detección de combinadas basada en co-menciones en chat, correlación calculada por frecuencia conjunta"
+    }
+  }
+}
