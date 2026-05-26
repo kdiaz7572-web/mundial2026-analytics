@@ -3,18 +3,15 @@
   "crons": [
     {
       "path": "/api/ferxxxa-markets",
-      "schedule": "0 6 * * *",
-      "description": "Real-time DoradoBet market scraper - runs daily at 6 AM UTC (matches World Cup kickoffs)"
+      "schedule": "0 6 * * *"
     },
     {
       "path": "/api/learn",
-      "schedule": "0 7 * * *",
-      "description": "Daily learning cycle - validates predictions, runs at 7 AM UTC"
+      "schedule": "0 7 * * *"
     },
     {
       "path": "/api/ferxxxa-community",
-      "schedule": "0 8 * * *",
-      "description": "FerXxxa Community Intelligence - betting chat analysis, runs daily at 8 AM UTC"
+      "schedule": "0 8 * * *"
     }
   ]
 }
