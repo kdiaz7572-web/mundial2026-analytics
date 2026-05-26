@@ -674,11 +674,20 @@ export default async function handler(req, res) {
   // Check critical dependencies FIRST
   if (!process.env.GROQ_API_KEY) {
     console.error('[chat] GROQ_API_KEY not configured - falling back');
+    // Generate fallback parlays even if Groq is not configured
+    const fallbackParlays = [
+      generateParlay(1, 'conservative', 50000, null, null),
+      generateParlay(2, 'moderate', 50000, null, null),
+      generateParlay(3, 'aggressive', 50000, null, null),
+      generateParlay(4, 'very_aggressive', 50000, null, null),
+      generateParlay(5, 'community_pick', 50000, null, null)
+    ];
     return sendSuccess(res, {
       response: 'IA-Zak necesita configuración. Por favor, contacta al administrador.',
       reasoning_chain: ['Revisor de configuración', 'GROQ_API_KEY no encontrada', 'Entrando en modo fallback'],
       recommendations: ['Configure GROQ_API_KEY en Vercel environment variables'],
       kelly_calculations: null,
+      recommended_parlays: fallbackParlays,
       data_sources_used: [],
       confidence: 'unavailable',
       tool_calls: [],
@@ -902,12 +911,32 @@ FERXXXA DORADOBET INTELLIGENCE: Temporarily unavailable (${e.message})
       });
     } catch (groqError) {
       console.error('Groq API error:', groqError.message);
+      console.error('Groq error details:', {
+        code: groqError.code,
+        status: groqError.status,
+        message: groqError.message,
+        hasApiKey: !!process.env.GROQ_API_KEY
+      });
+
+      // Generate fallback parlays when Groq fails
+      const parlayProfiles = ['conservative', 'moderate', 'aggressive', 'very_aggressive', 'community_pick'];
+      const fallbackParlays = parlayProfiles.map((profile, index) => {
+        return generateParlay(
+          index + 1,
+          profile,
+          bankroll || 50000,
+          ferxxxaMarkets,
+          ferxxxaCommunity
+        );
+      });
+
       // Fallback: return basic response without LLM
       return sendSuccess(res, {
         response: 'IA-Zak está temporalmente offline. Intenta de nuevo en un momento.',
         reasoning_chain: ['Intentando conectar con Groq...', 'Servicio no disponible', 'Retornando respuesta de fallback'],
         recommendations: [],
         kelly_calculations: null,
+        recommended_parlays: fallbackParlays,
         data_sources_used: [],
         confidence: 'low',
         tool_calls: [],
