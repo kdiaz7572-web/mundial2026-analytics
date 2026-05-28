@@ -287,306 +287,33 @@ async function executeGroqTool(toolName, toolInput) {
 }
 
 /**
- * System prompt templates - OPTIMIZED for max_tokens 3000
- * Compact but complete instructions for 5-parlay generation
+ * System prompt templates for Spanish and English
+ * CLAUDE-LIKE REASONING: Step-by-step transparency with source citations
+ * ENHANCED v5.0: 5-Parlay generation with varying risk profiles
  */
 const SYSTEM_PROMPTS = {
-  es: `Eres IA-Zak v5: genera 5 parlays (Kelly 4%,7%,9%,11%,12%). JSON con eventos, probs, odds, ₡. Cita fuentes. {USER_CONTEXT}`,
-  en: `You are IA-Zak v5: generate 5 parlays (Kelly 4%,7%,9%,11%,12%). JSON with events, probabilities, odds, colones. Cite sources. {USER_CONTEXT}`
-}; ============================================================
-// Rebuild trigger: 2026-05-23 22:15:00
-//  Chat Endpoint - Groq LLM Integration for IA-Zak v3.0
-//  - FerXxxa Intel Integration: Receives DoradoBet chat context
-//  - Processes user messages, maintains conversation history,
-//  - Executes tools, and returns betting recommendations
-// ============================================================
+  es: `Eres IA-Zak v5.0 - Un asistente especializado en Mundial 2026 que razona como Claude.
 
-import Groq from 'groq-sdk';
-import { getDb } from './_db.js';
+TU FORMA DE PENSAR (Tipo Claude):
+1. Siempre cuestiono mis propias conclusiones
+2. Reconozco limitaciones explícitamente
+3. Cito mis fuentes de datos [DoradoBet: ...], [FerXxxa: ...], etc.
+4. Muestro contradicciones entre fuentes
+5. Advierto sobre incertidumbres y falta de datos
 
-// Inline simple utility functions to avoid middleware import issues
-const sanitizeInput = (input) => {
-  if (typeof input !== 'string') return input;
-  return input.replace(/[<>]/g, '').replace(/javascript:/gi, '').slice(0, 5000);
-};
+PROCESO DE ANÁLISIS (Paso a Paso - VISIBLE al usuario):
+Paso 1: ENTIENDO - ¿Qué pregunta haces? ¿Qué partido/mercado necesito analizar?
+Paso 2: BUSCO DATOS REALES - DoradoBet (cuotas vivas), FerXxxa (sentimiento comunitario), xG, lesiones
+Paso 3: IDENTIFICO CONFLICTOS - ¿Hay divergencia entre lo que apuesta la comunidad vs mi modelo?
+Paso 4: CALCULO - Kelly Criterion con datos reales de DoradoBet + ajustes comunitarios
+Paso 5: EVALÚO RIESGO - Kelly %, Risk of Ruin, correlación entre eventos
+Paso 6: GENERO 5 PARLAYS - Perfiles de riesgo variados (Conservative → Very Aggressive + Community Pick)
 
-const sendError = (res, statusCode, errorType, message, details = {}) => {
-  res.status(statusCode).json({ success: false, error: errorType, message, ...details });
-};
+CONTEXTO DEL USUARIO:
+{USER_CONTEXT}
 
-const sendSuccess = (res, data = {}, message = '') => {
-  res.status(200).json({ success: true, message, ...data });
-};
-
-const groq = new Groq({
-  apiKey: process.env.GROQ_API_KEY
-});
-
-/**
- * ========================================================================
- * ENHANCED: Fetch FerXxxa Community Intelligence from zak_intel
- * ========================================================================
- * Queries zak_intel table for:
- * 1. ferxxxa_markets: Real DoradoBet odds and market data
- * 2. ferxxxa_community: Community sentiment, trending bets, injury reports
- *
- * Returns enriched context for parlay generation
- */
-async function fetchFerXxxaIntel(matchId, db) {
-  try {
-    const now = new Date();
-    const fiveMinutesAgo = new Date(now.getTime() - 5 * 60 * 1000);
-
-    // Query 1: Real market odds from DoradoBet (via FerXxxa API)
-    const marketsResult = await db`
-      SELECT summary_json, studied_at FROM zak_intel
-      WHERE topic = 'ferxxxa_markets'
-      AND match_id = ${matchId}
-      AND studied_at > ${fiveMinutesAgo}
-      ORDER BY studied_at DESC
-      LIMIT 1
-    `;
-
-    // Query 2: Community predictions and sentiment
-    const communityResult = await db`
-      SELECT summary_json, studied_at FROM zak_intel
-      WHERE topic = 'ferxxxa_community'
-      AND match_id = ${matchId}
-      AND studied_at > ${fiveMinutesAgo}
-      ORDER BY studied_at DESC
-      LIMIT 1
-    `;
-
-    const markets = marketsResult && marketsResult[0] ? marketsResult[0].summary_json : null;
-    const community = communityResult && communityResult[0] ? communityResult[0].summary_json : null;
-
-    let stale = false;
-    let warning = null;
-
-    // Check if data is aging (between 5-10 minutes old)
-    if (marketsResult && marketsResult[0]) {
-      const marketAge = Math.round((now - new Date(marketsResult[0].studied_at)) / 60000);
-      if (marketAge > 5) {
-        stale = true;
-        warning = `Markets ${marketAge} minutes old`;
-      }
-    }
-
-    return {
-      markets,
-      community,
-      stale,
-      warning,
-      timestamp: now.toISOString()
-    };
-  } catch (error) {
-    console.error('[fetchFerXxxaIntel] Error:', error.message);
-    return {
-      markets: null,
-      community: null,
-      error: error.message,
-      timestamp: new Date().toISOString()
-    };
-  }
-}
-
-/**
- * ========================================================================
- * Kelly Criterion Calculator for Parlay Events
- * ========================================================================
- * kelly_% = (edge × probability) / odds
- * where edge = (probability × odds) - 1
- */
-function calculateKelly(probability, odds) {
-  if (!probability || !odds || odds <= 1) return 0;
-  const edge = (probability * odds) - 1;
-  if (edge <= 0) return 0;
-  return (edge * probability) / odds;
-}
-
-/**
- * ========================================================================
- * Risk of Ruin Calculator
- * ========================================================================
- * Approximation: P(ruin) ≈ (1-edge)^n where n=number of bets
- * For parlays, we use a simplified formula based on Kelly and variance
- */
-function calculateRiskOfRuin(kellyPercentage, bankroll) {
-  if (kellyPercentage <= 0 || kellyPercentage > 0.5) return 0;
-
-  // Simplified Risk of Ruin ≈ e^(-2 × edge × kelly_pct)
-  // For parlays: ROR increases exponentially with number of events
-  const edge = kellyPercentage * 0.1; // Approximate edge from Kelly
-  const ror = Math.exp(-2 * Math.max(0.001, edge) * kellyPercentage);
-
-  return Math.min(100, Math.round(ror * 1000) / 10); // Cap at 100%, round to 1 decimal
-}
-
-/**
- * ========================================================================
- * Generate 5 Intelligent Parlays with varying risk profiles
- * ========================================================================
- */
-function generateParlay(rank, profile, bankroll, markets, communityData) {
-  // Profile definitions: kelly%, name, risk_description
-  const profiles = {
-    conservative: {
-      kelly_target: 0.04,
-      name: 'Conservadora',
-      risk: 'Bajo riesgo, alta probabilidad',
-      color: '#2ecc71'
-    },
-    moderate: {
-      kelly_target: 0.07,
-      name: 'Moderada',
-      risk: 'Riesgo balanceado',
-      color: '#f39c12'
-    },
-    aggressive: {
-      kelly_target: 0.09,
-      name: 'Agresiva',
-      risk: 'Mayor varianza, oportunidades de arbitraje',
-      color: '#e74c3c'
-    },
-    very_aggressive: {
-      kelly_target: 0.11,
-      name: 'Muy Agresiva',
-      risk: 'Borde de la ruina, edge plays',
-      color: '#c0392b'
-    },
-    community_pick: {
-      kelly_target: 0.12,
-      name: 'Consenso Comunitario',
-      risk: 'Lo que apuesta la comunidad',
-      color: '#3498db'
-    }
-  };
-
-  const prof = profiles[profile] || profiles.conservative;
-  const kellyPct = prof.kelly_target;
-  const bankrollAmount = Math.round(bankroll * kellyPct);
-
-  // Generate synthetic parlay events based on profile
-  // In production, these would come from markets and community data
-  const eventMaps = {
-    conservative: [
-      { market: '1x2 Result', prediction: 'Home Win', probability: 0.58, odds: 1.72 },
-      { market: 'Total Goals', prediction: 'Under 2.5', probability: 0.45, odds: 1.95 }
-    ],
-    moderate: [
-      { market: '1x2 Result', prediction: 'Home Win', probability: 0.58, odds: 1.72 },
-      { market: 'Total Goals', prediction: 'Over 2.5', probability: 0.62, odds: 1.65 },
-      { market: 'BTTS', prediction: 'Both Teams Score', probability: 0.48, odds: 2.10 }
-    ],
-    aggressive: [
-      { market: '1x2 Result', prediction: 'Home Win', probability: 0.58, odds: 1.72 },
-      { market: 'Total Goals', prediction: 'Over 3.5', probability: 0.38, odds: 2.55 },
-      { market: 'BTTS', prediction: 'Both Teams Score', probability: 0.48, odds: 2.10 },
-      { market: 'Corners', prediction: 'Over 8.5', probability: 0.52, odds: 1.85 }
-    ],
-    very_aggressive: [
-      { market: '1x2 Result', prediction: 'Home Win', probability: 0.58, odds: 1.72 },
-      { market: 'Total Goals', prediction: 'Over 4.5', probability: 0.22, odds: 4.20 },
-      { market: 'Home Corners', prediction: 'Over 4.5', probability: 0.55, odds: 1.80 },
-      { market: 'Shots on Target', prediction: 'Over 6.5', probability: 0.50, odds: 1.90 }
-    ],
-    community_pick: [
-      { market: '1x2 Result', prediction: 'Home Win', probability: 0.58, odds: 1.72 },
-      { market: 'Total Goals', prediction: 'Over 2.5', probability: 0.62, odds: 1.65 },
-      { market: 'BTTS', prediction: 'Both Teams Score', probability: 0.48, odds: 2.10 }
-    ]
-  };
-
-  const events = eventMaps[profile] || eventMaps.conservative;
-
-  // Calculate combined probability with correlation adjustment
-  const correlationFactors = {
-    conservative: 0.88, // Anti-correlated (Home Win + Under reduces correlation)
-    moderate: 0.95,     // Slightly correlated
-    aggressive: 1.05,   // Positively correlated
-    very_aggressive: 1.08, // Strongly correlated
-    community_pick: 1.02   // Based on actual community bets
-  };
-
-  let combinedProb = 1.0;
-  let combinedOdds = 1.0;
-  events.forEach(evt => {
-    combinedProb *= evt.probability;
-    combinedOdds *= evt.odds;
-  });
-
-  combinedProb *= correlationFactors[profile];
-  combinedProb = Math.min(0.95, Math.max(0.01, combinedProb)); // Cap between 1-95%
-
-  const kellyCalc = calculateKelly(combinedProb, combinedOdds);
-  const riskOfRuin = calculateRiskOfRuin(kellyCalc, bankroll);
-  const expectedWin = bankrollAmount * (combinedOdds - 1);
-
-  return {
-    rank,
-    name: `${prof.name} - ${events.slice(0, 2).map(e => e.prediction).join(' + ')}`,
-    risk_profile: profile,
-    kelly_percentage: Math.round(kellyCalc * 1000) / 10,
-    bankroll_amount_colones: bankrollAmount,
-    expected_win_colones: Math.round(expectedWin),
-    max_loss_colones: bankrollAmount,
-    risk_of_ruin_percent: riskOfRuin,
-    events: events.map(e => ({
-      market: e.market,
-      prediction: e.prediction,
-      your_probability: e.probability,
-      odds: e.odds,
-      source: 'doradobet_real'
-    })),
-    combined_probability: Math.round(combinedProb * 10000) / 10000,
-    combined_odds: Math.round(combinedOdds * 100) / 100,
-    edge_calculation: `${Math.round((calculateKelly(combinedProb, combinedOdds) * 100) * 10) / 10}%`,
-    detailed_reasoning: generateParrayReasoning(profile, events, prof.risk),
-    community_consensus: {
-      consensus_bets: 'Market-driven analysis',
-      community_frequency: `${Math.round(Math.random() * 60) + 20}%`,
-      community_sentiment: ['positive', 'neutral', 'mixed'][Math.floor(Math.random() * 3)],
-      our_divergence: 'Aligned with Kelly principle'
-    },
-    arbitrage_check: {
-      has_opportunity: false,
-      note: 'Real odds align with optimal weighting'
-    }
-  };
-}
-
-/**
- * Generate contextual reasoning for each parlay
- */
-function generateParrayReasoning(profile, events, riskDesc) {
-  const marketDescriptions = {
-    conservative: 'Equilibrada entre equipo fuerte y cautela en goles totales. Baja varianza.',
-    moderate: 'Balance entre victoria local y goles abundantes. Riesgo medio, recompensa sólida.',
-    aggressive: 'Equipo fuerte con ofensiva esperada. Correlaciones positivas aumentan varianza.',
-    very_aggressive: 'Edge plays basados en líneas desalineadas. Requiere confianza en modelo.',
-    community_pick: 'Alineada con sentimiento comunitario. Validada contra predicciones de otros.'
-  };
-
-  return marketDescriptions[profile] || 'Análisis estructura basado en perfil de riesgo.';
-}
-
-/**
- * ========================================================================
- * Tool execution wrapper (from existing code)
- * ========================================================================
- */
-async function executeGroqTool(toolName, toolInput) {
-  // This is a placeholder - tools would be defined elsewhere
-  // For now, return a basic result
-  return { success: false, message: 'Tools not yet implemented' };
-}
-
-/**
- * System prompt templates - OPTIMIZED for max_tokens 3000
- * Compact but complete instructions for 5-parlay generation
- */
-const SYSTEM_PROMPTS = {
-  es: `Eres IA-Zak v5: genera 5 parlays con Kelly 4%,7%,9%,11%,12%. JSON: eventos, probs, odds, Kelly%, ₡, RoR. Cita [FBREF],[DoradoBet]. User: {USER_CONTEXT}`
+RECOMENDACIONES DE APUESTA EN COLONES (₡):
+INSTRUCCIONES CRÍTICAS para apuestas:
 1. CANTIDAD EXACTA: Cuando recomiendes una apuesta, SIEMPRE incluye el monto EXACTO en colones (₡)
 2. FÓRMULA KELLY: Usa la fórmula Kelly Criterion: kelly_% = (edge × probability) / odds
    - Ejemplo: Si probabilidad=68%, odds=1.80, entonces edge = (0.68×1.80)-1 = 0.224 = 22.4%
@@ -1179,7 +906,7 @@ FERXXXA DORADOBET INTELLIGENCE: Temporarily unavailable (${e.message})
           ...messages
         ],
         temperature: 0.7,
-        max_tokens: 3000, // Increased from 1000 to accommodate 5 complete parlays with detailed reasoning
+        max_tokens: 3000,
         response_format: { type: 'json_object' } // Request JSON output
       });
     } catch (groqError) {
@@ -1358,4 +1085,3 @@ FERXXXA DORADOBET INTELLIGENCE: Temporarily unavailable (${e.message})
     });
   }
 }
-
