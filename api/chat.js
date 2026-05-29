@@ -33,8 +33,16 @@ const sendSuccess = (res, data = {}, message = '') => {
   res.status(200).json({ success: true, message, ...data });
 };
 
+// Initialize Groq with API key validation
+const groqApiKey = process.env.GROQ_API_KEY;
+console.log('[chat] Groq initialization:', {
+  hasApiKey: !!groqApiKey,
+  keyLength: groqApiKey ? groqApiKey.length : 0,
+  keyStart: groqApiKey ? groqApiKey.substring(0, 10) : 'MISSING'
+});
+
 const groq = new Groq({
-  apiKey: process.env.GROQ_API_KEY
+  apiKey: groqApiKey || 'sk-missing-api-key' // Fallback to prevent crash
 });
 
 /**
