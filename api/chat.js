@@ -1092,12 +1092,16 @@ FERXXXA DORADOBET INTELLIGENCE: Temporarily unavailable (${e.message})
         combinedProb = Math.round(combinedProb * 10000) / 10000;
       }
 
+      // Always use server calculation if Groq returns 0 or missing
+      const finalRoR = (parlay.risk_of_ruin_percent > 0) ? parlay.risk_of_ruin_percent : ror;
+      const finalWin = (parlay.expected_win_colones > 0) ? parlay.expected_win_colones : expectedWin;
+
       return {
         rank: parlay.rank || (idx + 1),
         ...parlay,
         bankroll_amount_colones: stake,
-        expected_win_colones: parlay.expected_win_colones || expectedWin,
-        risk_of_ruin_percent: parlay.risk_of_ruin_percent || ror,
+        expected_win_colones: finalWin,
+        risk_of_ruin_percent: finalRoR,
         combined_probability: combinedProb,
         max_loss_colones: stake
       };
