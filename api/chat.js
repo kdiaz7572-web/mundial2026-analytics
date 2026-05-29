@@ -878,16 +878,23 @@ export default async function handler(req, res) {
       console.log(`[chat] 🎯 Player detected: "${detectedPlayerName}"`);
       try {
         playerAnalyzed = await analyzePlayer(detectedPlayerName);
+        console.log(`[chat] analyzePlayer() returned:`, { success: playerAnalyzed?.success, hasPlayer: !!playerAnalyzed?.player, playerName: playerAnalyzed?.player?.name });
+
         if (playerAnalyzed && playerAnalyzed.player) {
           console.log(`[chat] ✅ Player analysis (${playerAnalyzed.success ? 'real' : 'fallback'}): ${playerAnalyzed.player.name}`);
           // Generate betting suggestions for this player
           playerBettingSuggestions = generatePlayerBettingSuggestions(playerAnalyzed);
-          console.log(`[chat] 📊 Generated player betting suggestions`);
+          console.log(`[chat] 📊 Generated player betting suggestions`, { optionsCount: playerBettingSuggestions?.options?.length });
+        } else {
+          console.warn(`[chat] ⚠️ No player data returned from analyzePlayer()`);
         }
       } catch (playerError) {
         console.warn(`[chat] ⚠️ Player analysis failed: ${playerError.message}`);
+        console.error(`[chat] Stack:`, playerError.stack);
         // Continue anyway - not critical
       }
+    } else {
+      console.log(`[chat] ℹ️ No player detected in message`);
     }
 
     // =====================================================
