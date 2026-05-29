@@ -178,8 +178,25 @@ function generateRecommendation(stats, goalProb) {
 function generatePlayerFallback(playerName) {
   return {
     success: false,
-    player: { name: playerName, team: 'Unknown' },
+    player: { name: playerName, team: 'Unknown', position: 'FW' },
     note: 'Datos limitados - usando análisis general',
+    seasonStats: {
+      goals: 8,
+      assists: 3,
+      shots: 24,
+      shotsOn: 8,
+      passes: 450,
+      passAccuracy: 0.82,
+      dribbles: 15,
+      dribbleSuccess: 0.60,
+      fouls: 12,
+      yellowCards: 2,
+      redCards: 0,
+      tackles: 4,
+      interceptions: 2,
+      appearances: 12,
+      minutes: 850
+    },
     probabilities: {
       goal: 0.35,
       assist: 0.20,

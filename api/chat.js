@@ -320,6 +320,32 @@ function generateParrayReasoning(profile, events, riskDesc) {
 
 /**
  * ========================================================================
+ * Detect Player Name in User Message
+ * ========================================================================
+ * Returns player name if user is asking about a specific player
+ */
+function detectPlayerInMessage(message) {
+  // List of known World Cup players (easiest detection)
+  const knownPlayers = [
+    'Mbappé', 'Mbappe', 'Bellingham', 'Yamal', 'Lamine Yamal', 'Vinicius', 'Vinícius', 'Rodrygo',
+    'Haaland', 'Kane', 'Salah', 'Messi', 'Ronaldo', 'Dembélé', 'Wirtz', 'Musiala', 'Pedri',
+    'Jude Bellingham', 'Vinícius Jr', 'Rodríguez', 'Álvarez', 'Julián Álvarez', 'Osimhen'
+  ];
+
+  // First: Try to find known players (most reliable)
+  for (const player of knownPlayers) {
+    const playerRegex = new RegExp(`\\b${player}\\b`, 'i');
+    if (playerRegex.test(message)) {
+      console.log(`[detectPlayer] Found known player: "${player}"`);
+      return player;
+    }
+  }
+
+  return null;
+}
+
+/**
+ * ========================================================================
  * Tool execution wrapper (from existing code)
  * ========================================================================
  */
@@ -842,6 +868,29 @@ export default async function handler(req, res) {
     }
 
     // =====================================================
+    // 2.0.1 DETECT PLAYER AND ANALYZE (NEW)
+    // =====================================================
+    let playerAnalyzed = null;
+    let playerBettingSuggestions = null;
+    const detectedPlayerName = detectPlayerInMessage(sanitizedMessage);
+
+    if (detectedPlayerName) {
+      console.log(`[chat] 🎯 Player detected: "${detectedPlayerName}"`);
+      try {
+        playerAnalyzed = await analyzePlayer(detectedPlayerName);
+        if (playerAnalyzed && playerAnalyzed.player) {
+          console.log(`[chat] ✅ Player analysis (${playerAnalyzed.success ? 'real' : 'fallback'}): ${playerAnalyzed.player.name}`);
+          // Generate betting suggestions for this player
+          playerBettingSuggestions = generatePlayerBettingSuggestions(playerAnalyzed);
+          console.log(`[chat] 📊 Generated player betting suggestions`);
+        }
+      } catch (playerError) {
+        console.warn(`[chat] ⚠️ Player analysis failed: ${playerError.message}`);
+        // Continue anyway - not critical
+      }
+    }
+
+    // =====================================================
     // 2.1. INTEGRATION POINT: Fetch Real FerXxxa Intel (Markets + Community)
     // =====================================================
     let ferxxxaContext = '';
@@ -1048,11 +1097,46 @@ FERXXXA DORADOBET INTELLIGENCE: Temporarily unavailable (${e.message})
     }
 
     // =====================================================
-    // 5. Generate 5 Intelligent Parlays (if not already in Groq response)
+    // 5. Generate 5 Intelligent Parlays (or Player Suggestions if detected)
     // =====================================================
     let generatedParlays = groqOutput.recommended_parlays || [];
+    let usePlayerSuggestions = false;
 
-    // If Groq didn't generate parlays, we generate them
+    // If player was analyzed, use player suggestions instead of generic parlays
+    if (playerBettingSuggestions) {
+      console.log(`[chat] 🎯 Using player-specific betting suggestions (detected: ${playerAnalyzed.player.name})`);
+
+      // Transform player suggestions into parlay-like format
+      generatedParlays = playerBettingSuggestions.options.map((option, index) => ({
+        rank: index + 1,
+        name: `${option.profile} - ${option.prediction}`,
+        risk_profile: option.riskLevel.toLowerCase().replace(/[^a-z_]/g, ''),
+        kelly_percentage: parseFloat(option.kelly) || (4 + index * 3),
+        bankroll_amount_colones: option.bankrollSuggestion
+          ? parseInt(option.bankrollSuggestion.replace(/[^\d]/g, '')) || (3000 + index * 2000)
+          : (3000 + index * 2000),
+        combined_probability: parseFloat(option.probability) || 0.5,
+        combined_odds: parseFloat(option.estimatedOdds) || (2.0 + index * 0.5),
+        prediction: option.prediction,
+        market: option.market,
+        detailed_reasoning: option.reasoning,
+        confidence: option.confidence,
+        events: [
+          {
+            market: option.market,
+            prediction: option.prediction,
+            your_probability: parseFloat(option.probability) || 0.5,
+            odds: parseFloat(option.estimatedOdds) || (2.0 + index * 0.5),
+            source: 'player_analyzer'
+          }
+        ]
+      }));
+
+      usePlayerSuggestions = true;
+      console.log(`[chat] ✅ Generated ${generatedParlays.length} player-specific betting suggestions`);
+    }
+
+    // If no player suggestions, generate generic parlays
     if (!generatedParlays || generatedParlays.length === 0) {
       const parlayProfiles = ['conservative', 'moderate', 'aggressive', 'very_aggressive', 'community_pick'];
 
@@ -1067,7 +1151,7 @@ FERXXXA DORADOBET INTELLIGENCE: Temporarily unavailable (${e.message})
       });
 
       console.log(`[chat] Generated ${generatedParlays.length} parlays (Groq output did not include them)`);
-    } else {
+    } else if (!usePlayerSuggestions) {
       console.log(`[chat] Using ${generatedParlays.length} parlays from Groq output`);
     }
 
@@ -1119,27 +1203,38 @@ FERXXXA DORADOBET INTELLIGENCE: Temporarily unavailable (${e.message})
     }
 
     // =====================================================
-    // 7. Return response with all Groq output + FerXxxa metadata + 5 Parlays
+    // 7. Return response with all Groq output + FerXxxa metadata + 5 Parlays + Player Analysis
     // =====================================================
     return sendSuccess(res, {
       response: groqOutput.response || groqOutput.analysis || 'No response generated',
       reasoning_chain: groqOutput.reasoning_chain || [],
       recommendations: groqOutput.recommendations || [],
       kelly_calculations: groqOutput.kelly_calculations || null,
-      recommended_parlays: generatedParlays, // ALWAYS include 5 parlays
+      recommended_parlays: generatedParlays, // ALWAYS include 5 parlays or player suggestions
       data_sources_used: groqOutput.data_sources_used || [],
       uncertainties: groqOutput.uncertainties || [],
       confidence: groqOutput.confidence || 'medium',
       tool_calls: executedTools,
       bankroll_impact: bankrollImpact > 0 ? Math.round(bankrollImpact * 10000) / 100 : null,
       language: language,
+      // ===== NEW: Player Analysis Context =====
+      player_analyzed: playerAnalyzed ? {
+        name: playerAnalyzed.player.name,
+        team: playerAnalyzed.player.team,
+        position: playerAnalyzed.player.position,
+        seasonStats: playerAnalyzed.seasonStats,
+        probabilities: playerAnalyzed.probabilities,
+        form: playerAnalyzed.form
+      } : null,
+      player_suggestions: playerBettingSuggestions ? playerBettingSuggestions : null,
       ferxxxa_intel: {
         ...ferxxxaMetadata,
         markets_available: !!ferxxxaMarkets,
         community_available: !!ferxxxaCommunity,
-        parlays_count: generatedParlays.length
+        parlays_count: generatedParlays.length,
+        player_analysis_enabled: !!playerAnalyzed
       }
-    }, 'Analysis complete with 5 parlays');
+    }, 'Analysis complete with player-specific or generic parlays');
 
   } catch (error) {
     console.error('Chat endpoint error:', error);
