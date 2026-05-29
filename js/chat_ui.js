@@ -173,6 +173,11 @@ const ChatUI = {
 
     html += `<div class="text-sm text-slate-100 mb-3">${this.escapeHtml(msg.content || msg.response || 'Sin respuesta')}</div>`;
 
+    // RENDER PARLAYS (3 MAIN OPTIONS)
+    if (msg.recommended_parlays && Array.isArray(msg.recommended_parlays) && msg.recommended_parlays.length > 0) {
+      html += this.renderParlaysGrid(msg.recommended_parlays);
+    }
+
     if (msg.recommendations && Array.isArray(msg.recommendations)) {
       html += `<div class="mt-3 pt-3 border-t border-slate-700">
         <p class="text-xs font-bold text-emerald-400 mb-2">💡 Recomendaciones:</p>
@@ -242,6 +247,7 @@ const ChatUI = {
         content: data.response || data.message || 'Sin respuesta',
         reasoning_chain: data.reasoning_chain,
         recommendations: data.recommendations,
+        recommended_parlays: data.recommended_parlays,
         kelly_calculations: data.kelly_calculations,
         data_sources_used: data.data_sources_used,
         confidence: data.confidence,
@@ -297,6 +303,94 @@ const ChatUI = {
     const input = document.getElementById('chat-input');
     if (btn) btn.disabled = loading;
     if (input) input.disabled = loading;
+  },
+
+  renderParlaysGrid(parlays) {
+    // Color scheme by risk profile
+    const profileColors = {
+      'conservative': { bg: 'bg-emerald-900/20', border: 'border-emerald-500/50', icon: '🟢', label: 'Conservadora' },
+      'moderate': { bg: 'bg-amber-900/20', border: 'border-amber-500/50', icon: '🟡', label: 'Moderada' },
+      'aggressive': { bg: 'bg-red-900/20', border: 'border-red-500/50', icon: '🔴', label: 'Agresiva' },
+      'very_aggressive': { bg: 'bg-rose-900/20', border: 'border-rose-600/50', icon: '🔥', label: 'Muy Agresiva' },
+      'community_pick': { bg: 'bg-blue-900/20', border: 'border-blue-500/50', icon: '👥', label: 'Consenso' }
+    };
+
+    // Take first 3 parlays (Conservadora, Moderada, Agresiva)
+    const topParlays = parlays.slice(0, 3);
+
+    let gridHtml = `<div class="mt-4 grid grid-cols-1 gap-3">`;
+
+    topParlays.forEach((parlay, idx) => {
+      const profile = parlay.risk_profile || 'conservative';
+      const colors = profileColors[profile] || profileColors.conservative;
+
+      const bkAmount = parlay.bankroll_amount_colones || 0;
+      const expectedWin = parlay.expected_win_colones || 0;
+      const kelly = parlay.kelly_percentage || 0;
+      const ror = parlay.risk_of_ruin_percent || 0;
+      const odds = parlay.combined_odds || 0;
+      const prob = parlay.combined_probability || 0;
+
+      gridHtml += `
+      <div class="border rounded p-3 ${colors.bg} ${colors.border} border">
+        <div class="flex items-center justify-between mb-2">
+          <h4 class="font-bold text-sm flex items-center gap-2">
+            <span>${colors.icon}</span>
+            <span>${parlay.name || colors.label}</span>
+          </h4>
+        </div>
+
+        <div class="space-y-1.5 text-xs text-slate-200">
+          ${parlay.events && Array.isArray(parlay.events) ? `
+          <div class="mb-2 pb-2 border-b border-slate-600/30">
+            <p class="text-[10px] text-slate-400 uppercase tracking-wide font-semibold mb-1">Eventos:</p>
+            <div class="space-y-1">
+              ${parlay.events.slice(0, 3).map(evt =>
+                `<div class="text-[11px] text-slate-300">• ${evt.market}: <strong>${evt.prediction}</strong> (${evt.odds}x)</div>`
+              ).join('')}
+            </div>
+          </div>
+          ` : ''}
+
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <p class="text-[9px] text-slate-400 uppercase tracking-wide">Probabilidad</p>
+              <p class="font-bold text-sm text-slate-100">${Math.round(prob * 100)}%</p>
+            </div>
+            <div>
+              <p class="text-[9px] text-slate-400 uppercase tracking-wide">Cuota Total</p>
+              <p class="font-bold text-sm text-slate-100">${odds.toFixed(2)}</p>
+            </div>
+            <div>
+              <p class="text-[9px] text-slate-400 uppercase tracking-wide">Apostar</p>
+              <p class="font-bold text-sm text-emerald-400">₡${bkAmount.toLocaleString('es-CR')}</p>
+            </div>
+            <div>
+              <p class="text-[9px] text-slate-400 uppercase tracking-wide">Ganancia</p>
+              <p class="font-bold text-sm text-emerald-300">₡${expectedWin.toLocaleString('es-CR')}</p>
+            </div>
+            <div>
+              <p class="text-[9px] text-slate-400 uppercase tracking-wide">Kelly</p>
+              <p class="font-bold text-sm text-amber-400">${kelly.toFixed(1)}%</p>
+            </div>
+            <div>
+              <p class="text-[9px] text-slate-400 uppercase tracking-wide">Riesgo</p>
+              <p class="font-bold text-sm text-red-400">${ror.toFixed(1)}%</p>
+            </div>
+          </div>
+
+          ${parlay.detailed_reasoning ? `
+          <div class="mt-2 pt-2 border-t border-slate-600/20">
+            <p class="text-[10px] text-slate-400 italic">${this.escapeHtml(parlay.detailed_reasoning)}</p>
+          </div>
+          ` : ''}
+        </div>
+      </div>
+      `;
+    });
+
+    gridHtml += `</div>`;
+    return gridHtml;
   },
 
   escapeHtml(text) {
