@@ -17,7 +17,6 @@ import {
   calculateEdge
 } from '../js/kelly_calculator.js';
 import { analyzePlayer } from './player-analyzer.js';
-import { analyzeTeam, detectSubject } from './team-analyzer.js';
 import { generateSmartSuggestions, generatePlayerBettingSuggestions } from './smart-suggestions.js';
 
 // Inline simple utility functions to avoid middleware import issues
@@ -1410,4 +1409,5 @@ FERXXXA DORADOBET INTELLIGENCE: Temporarily unavailable (${e.message})
     });
   }
 }
+
 
