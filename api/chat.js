@@ -34,15 +34,19 @@ const sendSuccess = (res, data = {}, message = '') => {
 };
 
 // Initialize Groq with API key validation
-const groqApiKey = process.env.GROQ_API_KEY;
+// HARDCODED FALLBACK: GROQ_API_KEY_PLACEHOLDER
+const groqApiKey = process.env.GROQ_API_KEY || 'GROQ_API_KEY_PLACEHOLDER';
+
 console.log('[chat] Groq initialization:', {
   hasApiKey: !!groqApiKey,
   keyLength: groqApiKey ? groqApiKey.length : 0,
-  keyStart: groqApiKey ? groqApiKey.substring(0, 10) : 'MISSING'
+  keyStart: groqApiKey ? groqApiKey.substring(0, 10) : 'MISSING',
+  source: process.env.GROQ_API_KEY ? 'environment' : 'hardcoded-fallback',
+  timestamp: new Date().toISOString()
 });
 
 const groq = new Groq({
-  apiKey: groqApiKey || 'sk-missing-api-key' // Fallback to prevent crash
+  apiKey: groqApiKey
 });
 
 /**
