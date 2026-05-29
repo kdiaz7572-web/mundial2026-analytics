@@ -120,22 +120,31 @@ const ChatUI = {
 
   renderChatContainer() {
     return `
-    <div class="chat-container flex flex-col h-[500px] bg-slate-900 rounded-lg border border-slate-700">
-      <div id="chat-messages" class="flex-1 overflow-y-auto p-4 space-y-4 mb-4">
+    <div class="chat-container flex flex-col bg-slate-900 rounded-xl border border-slate-700/60 shadow-2xl" style="min-height:520px; max-height:80vh;">
+      <!-- Header -->
+      <div class="flex items-center gap-3 px-4 py-3 border-b border-slate-700/60 bg-slate-800/60 rounded-t-xl">
+        <div class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></div>
+        <span class="text-xs font-bold text-slate-300 tracking-wide uppercase">IA-Zak v8.0</span>
+        <span class="text-[10px] text-slate-500">· Especialista en Apuestas</span>
+      </div>
+      <!-- Messages -->
+      <div id="chat-messages" class="flex-1 overflow-y-auto p-4 space-y-4" style="min-height:380px;">
         ${this.renderMessages()}
       </div>
-      <div class="border-t border-slate-700 p-4">
-        <div class="flex gap-3">
-          <input id="chat-input" type="text" placeholder="¿Qué quieres analizar? (o usa 🎤)"
-            class="flex-1 px-4 py-2 rounded-lg bg-slate-800 text-white border border-slate-600 focus:border-violet-500 outline-none"
+      <!-- Input -->
+      <div class="border-t border-slate-700/60 p-3 bg-slate-800/40 rounded-b-xl">
+        <div class="flex gap-2">
+          <input id="chat-input" type="text"
+            placeholder="Ej: ¿Apuestas para Argentina vs Colombia?"
+            class="flex-1 px-4 py-2.5 rounded-lg bg-slate-800 text-white text-sm border border-slate-600 focus:border-violet-500 focus:ring-1 focus:ring-violet-500/30 outline-none placeholder-slate-500"
             onkeypress="if(event.key==='Enter') ChatUI.sendMessage()" />
           <button id="voice-btn" onclick="ChatUI.toggleVoiceInput()"
-            class="px-3 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-white font-bold transition-colors duration-200"
-            title="Presiona para hablar (reconocimiento de voz)">
-            🎤
-          </button>
-          <button onclick="ChatUI.sendMessage()" class="px-4 py-2 rounded-lg bg-violet-600 hover:bg-violet-700 text-white font-bold transition-colors" id="chat-send-btn">
-            📤
+            class="px-3 py-2.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-white text-sm transition-colors"
+            title="Voz">🎤</button>
+          <button onclick="ChatUI.sendMessage()"
+            class="px-4 py-2.5 rounded-lg bg-violet-600 hover:bg-violet-700 text-white text-sm font-bold transition-colors flex items-center gap-1.5"
+            id="chat-send-btn">
+            <span>Analizar</span><span>⚡</span>
           </button>
         </div>
       </div>
@@ -159,28 +168,42 @@ const ChatUI = {
   },
 
   renderAssistantMessage(msg) {
-    let html = `<div class="flex justify-start mb-4"><div class="max-w-md bg-slate-800/50 border border-slate-700 rounded-lg p-4">`;
+    const confColor = { high: 'text-emerald-400', medium: 'text-yellow-400', low: 'text-red-400' };
+    const confBadge = msg.confidence
+      ? `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-700 ${confColor[msg.confidence] || 'text-slate-400'}">🎯 ${msg.confidence.toUpperCase()}</span>`
+      : '';
 
-    if (msg.reasoning_chain && Array.isArray(msg.reasoning_chain)) {
-      html += `<div class="mb-3 p-3 bg-slate-900/50 border-l-2 border-amber-500 rounded">
-        <p class="text-xs font-bold text-amber-400 mb-2">🧠 Razonamiento:</p>
+    let html = `<div class="flex justify-start mb-4">
+      <div class="w-full bg-slate-800/60 border border-slate-700/60 rounded-xl p-4 shadow-lg">`;
+
+    // Reasoning chain (collapsible feel)
+    if (msg.reasoning_chain && Array.isArray(msg.reasoning_chain) && msg.reasoning_chain.length > 0) {
+      html += `<div class="mb-3 p-3 bg-slate-900/70 border-l-2 border-amber-500/70 rounded-lg">
+        <p class="text-[10px] font-bold text-amber-400 uppercase tracking-wider mb-2">🧠 Razonamiento</p>
         <div class="space-y-1">`;
       msg.reasoning_chain.forEach(step => {
-        html += `<div class="text-xs text-slate-300 leading-relaxed"><span class="text-amber-400">▸</span> ${this.escapeHtml(step)}</div>`;
+        html += `<div class="text-[11px] text-slate-400 leading-relaxed">
+          <span class="text-amber-500 mr-1">▸</span>${this.escapeHtml(step)}
+        </div>`;
       });
       html += `</div></div>`;
     }
 
-    html += `<div class="text-sm text-slate-100 mb-3">${this.escapeHtml(msg.content || msg.response || 'Sin respuesta')}</div>`;
+    // Main response text + confidence badge
+    html += `<div class="flex items-start justify-between gap-2 mb-3">
+      <p class="text-sm text-slate-100 leading-relaxed flex-1">${this.escapeHtml(msg.content || msg.response || 'Sin respuesta')}</p>
+      ${confBadge}
+    </div>`;
 
-    // RENDER PARLAYS (3 MAIN OPTIONS)
+    // PARLAYS GRID (main UI feature)
     if (msg.recommended_parlays && Array.isArray(msg.recommended_parlays) && msg.recommended_parlays.length > 0) {
       html += this.renderParlaysGrid(msg.recommended_parlays);
     }
 
-    if (msg.recommendations && Array.isArray(msg.recommendations)) {
-      html += `<div class="mt-3 pt-3 border-t border-slate-700">
-        <p class="text-xs font-bold text-emerald-400 mb-2">💡 Recomendaciones:</p>
+    // Quick recommendations
+    if (msg.recommendations && Array.isArray(msg.recommendations) && msg.recommendations.length > 0) {
+      html += `<div class="mt-3 pt-3 border-t border-slate-700/40">
+        <p class="text-[10px] font-bold text-emerald-400 uppercase tracking-wider mb-1.5">💡 Picks Rápidos</p>
         <div class="space-y-1">`;
       msg.recommendations.forEach(rec => {
         html += `<div class="text-xs text-slate-300">• ${this.escapeHtml(rec)}</div>`;
@@ -188,12 +211,11 @@ const ChatUI = {
       html += `</div></div>`;
     }
 
-    if (msg.data_sources_used && Array.isArray(msg.data_sources_used)) {
-      html += `<div class="mt-3 pt-2 text-[10px] text-slate-500">📊 Fuentes: ${msg.data_sources_used.join(', ')}</div>`;
-    }
-
-    if (msg.confidence) {
-      html += `<div class="mt-2 pt-2 border-t border-slate-700/50 text-[10px] text-slate-400">🎯 Confianza: <span class="text-yellow-400">${this.escapeHtml(msg.confidence)}</span></div>`;
+    // Footer: sources
+    if (msg.data_sources_used && Array.isArray(msg.data_sources_used) && msg.data_sources_used.length > 0) {
+      html += `<div class="mt-3 pt-2 border-t border-slate-700/30 text-[10px] text-slate-500">
+        📊 Fuentes: ${msg.data_sources_used.map(s => this.escapeHtml(s)).join(' · ')}
+      </div>`;
     }
 
     html += `</div></div>`;
@@ -306,90 +328,106 @@ const ChatUI = {
   },
 
   renderParlaysGrid(parlays) {
-    // Color scheme by risk profile
-    const profileColors = {
-      'conservative': { bg: 'bg-emerald-900/20', border: 'border-emerald-500/50', icon: '🟢', label: 'Conservadora' },
-      'moderate': { bg: 'bg-amber-900/20', border: 'border-amber-500/50', icon: '🟡', label: 'Moderada' },
-      'aggressive': { bg: 'bg-red-900/20', border: 'border-red-500/50', icon: '🔴', label: 'Agresiva' },
-      'very_aggressive': { bg: 'bg-rose-900/20', border: 'border-rose-600/50', icon: '🔥', label: 'Muy Agresiva' },
-      'community_pick': { bg: 'bg-blue-900/20', border: 'border-blue-500/50', icon: '👥', label: 'Consenso' }
+    const profileMeta = {
+      'conservative': { borderColor: '#10b981', labelColor: '#34d399', icon: '🟢', label: 'CONSERVADORA' },
+      'moderate':     { borderColor: '#f59e0b', labelColor: '#fbbf24', icon: '🟡', label: 'MODERADA' },
+      'aggressive':   { borderColor: '#ef4444', labelColor: '#f87171', icon: '🔴', label: 'AGRESIVA' },
+      'very_aggressive': { borderColor: '#dc2626', labelColor: '#fca5a5', icon: '🔥', label: 'MUY AGRESIVA' },
+      'community_pick': { borderColor: '#3b82f6', labelColor: '#93c5fd', icon: '👥', label: 'CONSENSO' }
     };
 
-    // Take first 3 parlays (Conservadora, Moderada, Agresiva)
+    // Show first 3 main profiles + extra button to expand
     const topParlays = parlays.slice(0, 3);
+    const extraCount = parlays.length - 3;
 
-    let gridHtml = `<div class="mt-4 grid grid-cols-1 gap-3">`;
+    let gridHtml = `
+    <div class="mt-4">
+      <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">⚡ Opciones de Apuesta</p>
+      <div class="grid grid-cols-1 gap-2.5">`;
 
-    topParlays.forEach((parlay, idx) => {
+    topParlays.forEach((parlay) => {
       const profile = parlay.risk_profile || 'conservative';
-      const colors = profileColors[profile] || profileColors.conservative;
+      const meta = profileMeta[profile] || profileMeta.conservative;
 
-      const bkAmount = parlay.bankroll_amount_colones || 0;
-      const expectedWin = parlay.expected_win_colones || 0;
-      const kelly = parlay.kelly_percentage || 0;
-      const ror = parlay.risk_of_ruin_percent || 0;
-      const odds = parlay.combined_odds || 0;
-      const prob = parlay.combined_probability || 0;
+      const stake    = parlay.bankroll_amount_colones || 0;
+      const win      = parlay.expected_win_colones || 0;
+      const kelly    = parlay.kelly_percentage || 0;
+      const ror      = typeof parlay.risk_of_ruin_percent === 'number' ? parlay.risk_of_ruin_percent : 0;
+      const odds     = parlay.combined_odds || 0;
+      const prob     = parlay.combined_probability || 0;
+      const events   = parlay.events || [];
+      const reason   = parlay.detailed_reasoning || parlay.reasoning || '';
+
+      // Strip team prefix from name for cleaner display
+      const shortName = (parlay.name || meta.label).replace(/^[^-]+-\s*/, '');
 
       gridHtml += `
-      <div class="border rounded p-3 ${colors.bg} ${colors.border} border">
-        <div class="flex items-center justify-between mb-2">
-          <h4 class="font-bold text-sm flex items-center gap-2">
-            <span>${colors.icon}</span>
-            <span>${parlay.name || colors.label}</span>
-          </h4>
+      <div class="rounded-lg overflow-hidden border" style="border-color: ${meta.borderColor}30; background: ${meta.borderColor}08;">
+        <!-- Card header -->
+        <div class="flex items-center justify-between px-3 py-2" style="background: ${meta.borderColor}18; border-bottom: 1px solid ${meta.borderColor}25;">
+          <div class="flex items-center gap-1.5">
+            <span class="text-xs">${meta.icon}</span>
+            <span class="text-[10px] font-black tracking-widest" style="color: ${meta.labelColor}">${meta.label}</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="text-[10px] text-slate-400">Kelly</span>
+            <span class="text-[11px] font-bold text-amber-400">${typeof kelly === 'number' ? kelly.toFixed(1) : kelly}%</span>
+            <span class="text-[10px] text-slate-500">RoR</span>
+            <span class="text-[11px] font-bold text-red-400">${typeof ror === 'number' ? ror.toFixed(2) : ror}%</span>
+          </div>
         </div>
 
-        <div class="space-y-1.5 text-xs text-slate-200">
-          ${parlay.events && Array.isArray(parlay.events) ? `
-          <div class="mb-2 pb-2 border-b border-slate-600/30">
-            <p class="text-[10px] text-slate-400 uppercase tracking-wide font-semibold mb-1">Eventos:</p>
-            <div class="space-y-1">
-              ${parlay.events.slice(0, 3).map(evt =>
-                `<div class="text-[11px] text-slate-300">• ${evt.market}: <strong>${evt.prediction}</strong> (${evt.odds}x)</div>`
-              ).join('')}
-            </div>
-          </div>
-          ` : ''}
-
-          <div class="grid grid-cols-2 gap-2">
-            <div>
-              <p class="text-[9px] text-slate-400 uppercase tracking-wide">Probabilidad</p>
-              <p class="font-bold text-sm text-slate-100">${Math.round(prob * 100)}%</p>
-            </div>
-            <div>
-              <p class="text-[9px] text-slate-400 uppercase tracking-wide">Cuota Total</p>
-              <p class="font-bold text-sm text-slate-100">${odds.toFixed(2)}</p>
-            </div>
-            <div>
-              <p class="text-[9px] text-slate-400 uppercase tracking-wide">Apostar</p>
-              <p class="font-bold text-sm text-emerald-400">₡${bkAmount.toLocaleString('es-CR')}</p>
-            </div>
-            <div>
-              <p class="text-[9px] text-slate-400 uppercase tracking-wide">Ganancia</p>
-              <p class="font-bold text-sm text-emerald-300">₡${expectedWin.toLocaleString('es-CR')}</p>
-            </div>
-            <div>
-              <p class="text-[9px] text-slate-400 uppercase tracking-wide">Kelly</p>
-              <p class="font-bold text-sm text-amber-400">${kelly.toFixed(1)}%</p>
-            </div>
-            <div>
-              <p class="text-[9px] text-slate-400 uppercase tracking-wide">Riesgo</p>
-              <p class="font-bold text-sm text-red-400">${ror.toFixed(1)}%</p>
-            </div>
-          </div>
-
-          ${parlay.detailed_reasoning ? `
-          <div class="mt-2 pt-2 border-t border-slate-600/20">
-            <p class="text-[10px] text-slate-400 italic">${this.escapeHtml(parlay.detailed_reasoning)}</p>
-          </div>
-          ` : ''}
+        <!-- Events list -->
+        ${events.length > 0 ? `
+        <div class="px-3 pt-2 pb-1 space-y-0.5">
+          ${events.slice(0, 3).map(evt => {
+            const evtOdds = evt.odds || evt.your_probability || '';
+            const evtPred = evt.prediction || '';
+            const evtMarket = evt.market || '';
+            return `<div class="flex items-center justify-between text-[11px]">
+              <span class="text-slate-400">${evtMarket}</span>
+              <span class="font-semibold text-slate-200">${evtPred} <span class="text-slate-500">(${evtOdds}x)</span></span>
+            </div>`;
+          }).join('')}
         </div>
-      </div>
-      `;
+        ` : (shortName ? `<div class="px-3 pt-2 text-xs text-slate-300">${shortName}</div>` : '')}
+
+        <!-- Financials row -->
+        <div class="grid grid-cols-4 gap-0 px-3 py-2 mt-1" style="border-top: 1px solid ${meta.borderColor}20;">
+          <div class="text-center">
+            <p class="text-[8px] text-slate-500 uppercase tracking-wide">Prob.</p>
+            <p class="font-bold text-xs text-slate-200">${prob > 0 ? Math.round(prob * 100) + '%' : '—'}</p>
+          </div>
+          <div class="text-center">
+            <p class="text-[8px] text-slate-500 uppercase tracking-wide">Cuota</p>
+            <p class="font-bold text-xs text-slate-200">${odds > 0 ? (typeof odds === 'number' ? odds.toFixed(2) : odds) : '—'}</p>
+          </div>
+          <div class="text-center">
+            <p class="text-[8px] text-slate-500 uppercase tracking-wide">Apostar</p>
+            <p class="font-bold text-xs" style="color: ${meta.labelColor}">₡${stake > 0 ? stake.toLocaleString('es-CR') : '—'}</p>
+          </div>
+          <div class="text-center">
+            <p class="text-[8px] text-slate-500 uppercase tracking-wide">Ganancia</p>
+            <p class="font-bold text-xs text-emerald-400">₡${win > 0 ? win.toLocaleString('es-CR') : '—'}</p>
+          </div>
+        </div>
+
+        ${reason ? `
+        <div class="px-3 pb-2">
+          <p class="text-[10px] text-slate-500 italic leading-relaxed">${this.escapeHtml(reason)}</p>
+        </div>` : ''}
+      </div>`;
     });
 
-    gridHtml += `</div>`;
+    // Show extra parlays count if any
+    if (extraCount > 0) {
+      gridHtml += `
+      <div class="text-center pt-1">
+        <p class="text-[10px] text-slate-500">+${extraCount} opciones adicionales disponibles (Muy Agresiva, Consenso)</p>
+      </div>`;
+    }
+
+    gridHtml += `</div></div>`;
     return gridHtml;
   },
 

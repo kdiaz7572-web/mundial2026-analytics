@@ -34,8 +34,8 @@ const sendSuccess = (res, data = {}, message = '') => {
 };
 
 // Initialize Groq with API key validation
-// HARDCODED FALLBACK: GROQ_API_KEY_PLACEHOLDER
-const groqApiKey = process.env.GROQ_API_KEY || 'GROQ_API_KEY_PLACEHOLDER';
+// API key must be set via GROQ_API_KEY environment variable in Vercel
+const groqApiKey = process.env.GROQ_API_KEY;
 
 console.log('[chat] Groq initialization:', {
   hasApiKey: !!groqApiKey,
@@ -1062,6 +1062,46 @@ FERXXXA DORADOBET INTELLIGENCE: Temporarily unavailable (${e.message})
     } else if (!usePlayerSuggestions) {
       console.log(`[chat] Using ${generatedParlays.length} parlays from Groq output`);
     }
+
+    // =====================================================
+    // 5.0.1 ENRICH PARLAYS: Calculate missing fields server-side
+    // Groq sometimes omits expected_win_colones, risk_of_ruin_percent, rank
+    // We recalculate them here with correct math to ensure UI always has data
+    // =====================================================
+    const effectiveBankroll = bankroll || 50000;
+    generatedParlays = generatedParlays.map((parlay, idx) => {
+      const kellyPct = parlay.kelly_percentage || 0;
+      const combinedOdds = parlay.combined_odds || 1;
+      const stake = parlay.bankroll_amount_colones || Math.round(effectiveBankroll * (kellyPct / 100));
+
+      // expected_win = stake × (odds - 1)
+      const expectedWin = (combinedOdds > 1 && stake > 0)
+        ? Math.round(stake * (combinedOdds - 1))
+        : 0;
+
+      // Risk of Ruin: RoR ≈ e^(-2 × kelly_fraction)
+      const kellyFraction = kellyPct / 100;
+      const ror = (kellyFraction > 0 && kellyFraction < 0.5)
+        ? Math.round(Math.exp(-2 * kellyFraction) * 10000) / 100
+        : 0;
+
+      // combined_probability from events if missing
+      let combinedProb = parlay.combined_probability;
+      if (!combinedProb && parlay.events && parlay.events.length > 0) {
+        combinedProb = parlay.events.reduce((acc, e) => acc * (e.probability || e.your_probability || 0.5), 1);
+        combinedProb = Math.round(combinedProb * 10000) / 10000;
+      }
+
+      return {
+        rank: parlay.rank || (idx + 1),
+        ...parlay,
+        bankroll_amount_colones: stake,
+        expected_win_colones: parlay.expected_win_colones || expectedWin,
+        risk_of_ruin_percent: parlay.risk_of_ruin_percent || ror,
+        combined_probability: combinedProb,
+        max_loss_colones: stake
+      };
+    });
 
     // =====================================================
     // 5.1. Execute tool calls if requested
