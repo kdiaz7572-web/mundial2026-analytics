@@ -17,6 +17,7 @@ import {
   calculateEdge
 } from '../js/kelly_calculator.js';
 import { analyzePlayer } from './player-analyzer.js';
+import { analyzeTeam, detectSubject } from './team-analyzer.js';
 import { generateSmartSuggestions, generatePlayerBettingSuggestions } from './smart-suggestions.js';
 
 // Inline simple utility functions to avoid middleware import issues
@@ -322,26 +323,98 @@ function generateParrayReasoning(profile, events, riskDesc) {
  * ========================================================================
  * Detect Player Name in User Message
  * ========================================================================
- * Returns player name if user is asking about a specific player
+ * Returns { type, name, displayName } for player, club_team, or national_team
+ * Delegates to detectSubject() from team-analyzer.js
  */
-function detectPlayerInMessage(message) {
-  // List of known World Cup players (easiest detection)
-  const knownPlayers = [
-    'Mbappé', 'Mbappe', 'Bellingham', 'Yamal', 'Lamine Yamal', 'Vinicius', 'Vinícius', 'Rodrygo',
-    'Haaland', 'Kane', 'Salah', 'Messi', 'Ronaldo', 'Dembélé', 'Wirtz', 'Musiala', 'Pedri',
-    'Jude Bellingham', 'Vinícius Jr', 'Rodríguez', 'Álvarez', 'Julián Álvarez', 'Osimhen'
-  ];
+function detectSubjectInMessage(message) {
+  return detectSubject(message);
+}
 
-  // First: Try to find known players (most reliable)
-  for (const player of knownPlayers) {
-    const playerRegex = new RegExp(`\\b${player}\\b`, 'i');
-    if (playerRegex.test(message)) {
-      console.log(`[detectPlayer] Found known player: "${player}"`);
-      return player;
-    }
+/**
+ * ========================================================================
+ * Format Player Analysis — bloque de 3 apuestas completas para el usuario
+ * ========================================================================
+ */
+function formatTeamResponse(teamData, bankroll = 50000) {
+  const { team, recentForm, probabilities: probs, nextMatch, bets, type } = teamData;
+  const br = typeof bankroll === 'number' && bankroll >= 5000 ? bankroll : 50000;
+  const emoji = type === 'national_team' ? '🌍' : '🏟️';
+  const label = type === 'national_team' ? 'SELECCIÓN' : 'EQUIPO';
+
+  const matchLine = nextMatch
+    ? `📅 ${nextMatch.home_team} vs ${nextMatch.away_team} | ${nextMatch.league} | ${nextMatch.is_home ? '🏠 LOCAL' : '✈️ VISITANTE'}`
+    : '📅 Próximo partido no disponible (requiere API_FOOTBALL_KEY)';
+
+  const formStr = recentForm ? recentForm.map(r => r.result === 'W' ? '✅' : r.result === 'D' ? '🟡' : '❌').join(' ') : '—';
+
+  const c = bets.conservative, m = bets.moderate, a = bets.aggressive;
+  const cBk = Math.round(br * c.kelly_pct / 100);
+  const mBk = Math.round(br * m.kelly_pct / 100);
+  const aBk = Math.round(br * a.kelly_pct / 100);
+
+  return [
+    `${emoji} ${label}: ${(team.name || '').toUpperCase()}`,
+    matchLine,
+    `📊 Últimos 5: ${formStr} | Goles/partido: ${probs.avgScored || '—'} anotados, ${probs.avgConceded || '—'} recibidos`,
+    `Prob. victoria: ${Math.round((probs.win || 0) * 100)}% | Empate: ${Math.round((probs.draw || 0) * 100)}% | Over 2.5: ${Math.round((probs.over25 || 0) * 100)}% | BTTS: ${Math.round((probs.btts || 0) * 100)}%`,
+    '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
+    '🎯 MIS 3 MEJORES APUESTAS',
+    '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
+    `🟢 CONSERVADORA\n  Mercado: ${c.market}\n  Apuesta: ${c.prediction}\n  Prob: ${c.probability_pct} | Cuota: ${c.estimated_odds} | Kelly: ${c.kelly_pct}%\n  Apostar: ₡${cBk.toLocaleString('es-CR')} | Confianza: ${c.confidence}\n  Por qué: ${c.reasoning}`,
+    '',
+    `🟡 MODERADA\n  Mercado: ${m.market}\n  Apuesta: ${m.prediction}\n  Prob: ${m.probability_pct} | Cuota: ${m.estimated_odds} | Kelly: ${m.kelly_pct}%\n  Apostar: ₡${mBk.toLocaleString('es-CR')} | Confianza: ${m.confidence}\n  Por qué: ${m.reasoning}`,
+    '',
+    `🔴 AGRESIVA\n  Mercado: ${a.market}\n  Apuesta: ${a.prediction}\n  Prob: ${a.probability_pct} | Cuota: ${a.estimated_odds} | Kelly: ${a.kelly_pct}% (fraccional 25%)\n  Apostar: ₡${aBk.toLocaleString('es-CR')} | Confianza: ${a.confidence}\n  Por qué: ${a.reasoning}`,
+    '',
+    `💰 BANKROLL (₡${br.toLocaleString('es-CR')}):\n  Conservadora ₡${cBk.toLocaleString('es-CR')} | Moderada ₡${mBk.toLocaleString('es-CR')} | Agresiva ₡${aBk.toLocaleString('es-CR')}\n  Total si juegas las 3: ₡${(cBk + mBk + aBk).toLocaleString('es-CR')}`,
+    '',
+    '⚠️ Estimaciones basadas en últimos 5 partidos. Apuesta responsablemente.'
+  ].join('\n');
+}
+
+function formatPlayerResponse(playerData, bankroll = 50000) {
+  const { player, seasonStats, probabilities, form, nextMatch, bets } = playerData;
+  const br = typeof bankroll === 'number' && bankroll >= 5000 ? bankroll : 50000;
+
+  const matchLine = nextMatch
+    ? `📅 ${nextMatch.home_team} vs ${nextMatch.away_team} | Liga: ${nextMatch.league} | ${nextMatch.is_home ? '🏠 LOCAL' : '✈️ VISITANTE'} vs ${nextMatch.opponent_team}`
+    : '📅 Próximo partido no disponible (requiere API_FOOTBALL_KEY)';
+
+  const stars = (p) => '⭐'.repeat(Math.min(5, Math.max(1, Math.round(p * 6))));
+
+  let bC, bM, bA;
+  if (bets?.conservative && bets?.moderate && bets?.aggressive) {
+    const c = bets.conservative, m = bets.moderate, a = bets.aggressive;
+    const cBk = Math.round(br * c.kelly_pct / 100);
+    const mBk = Math.round(br * m.kelly_pct / 100);
+    const aBk = Math.round(br * a.kelly_pct / 100);
+    bC = `🟢 CONSERVADORA\n  Mercado: ${c.market}\n  Apuesta: ${c.prediction}\n  Prob: ${c.probability_pct} | Cuota: ${c.estimated_odds} | Kelly: ${c.kelly_pct}%\n  Apostar: ₡${cBk.toLocaleString('es-CR')} | Confianza: ${c.confidence}\n  Por qué: ${c.reasoning}`;
+    bM = `🟡 MODERADA\n  Mercado: ${m.market}\n  Apuesta: ${m.prediction}\n  Prob: ${m.probability_pct} | Cuota: ${m.estimated_odds} | Kelly: ${m.kelly_pct}%\n  Apostar: ₡${mBk.toLocaleString('es-CR')} | Confianza: ${m.confidence}\n  Por qué: ${m.reasoning}`;
+    bA = `🔴 AGRESIVA\n  Mercado: ${a.market}\n  Apuesta: ${a.prediction}\n  Prob: ${a.probability_pct} | Cuota: ${a.estimated_odds} | Kelly: ${a.kelly_pct}% (fraccional 25%)\n  Apostar: ₡${aBk.toLocaleString('es-CR')} | Confianza: ${a.confidence}\n  Por qué: ${a.reasoning}\n\n💰 BANKROLL (₡${br.toLocaleString('es-CR')}):\n  Conservadora ₡${cBk.toLocaleString('es-CR')} | Moderada ₡${mBk.toLocaleString('es-CR')} | Agresiva ₡${aBk.toLocaleString('es-CR')}\n  Total si juegas las 3: ₡${(cBk + mBk + aBk).toLocaleString('es-CR')}`;
+  } else {
+    const gp = probabilities?.goal || 0.3, ap = probabilities?.assist || 0.2, sp = probabilities?.shot || 0.45;
+    const gO = Math.round(100 / Math.max(5, gp * 100)) / 100;
+    const mp = Math.min(0.88, gp + ap - gp * ap), mO = Math.round(100 / Math.max(5, mp * 100)) / 100;
+    const agp = Math.max(0.02, gp * ap * sp), aO = Math.round(100 / Math.max(2, agp * 100)) / 100;
+    const k = (p, o, f) => Math.max(1, Math.round(Math.max(0, (o - 1) * p - (1 - p)) / (o - 1) * f * 100));
+    const cK = k(gp, gO, 0.5), mK = k(mp, mO, 0.5), aK = k(agp, aO, 0.25);
+    const cBk = Math.round(br * cK / 100), mBk = Math.round(br * mK / 100), aBk = Math.round(br * aK / 100);
+    bC = `🟢 CONSERVADORA\n  Mercado: Any Goal Scorer\n  Apuesta: ${player.name} anota 1+ gol\n  Prob: ${Math.round(gp * 100)}% | Cuota: ${gO} | Kelly: ${cK}%\n  Apostar: ₡${cBk.toLocaleString('es-CR')} | Confianza: ${stars(gp)}\n  Por qué: ${seasonStats?.goals || 0} goles en ${seasonStats?.appearances || 0} partidos`;
+    bM = `🟡 MODERADA\n  Mercado: Anota O Asiste\n  Apuesta: ${player.name} Anota O Asiste\n  Prob: ${Math.round(mp * 100)}% | Cuota: ${mO} | Kelly: ${mK}%\n  Apostar: ₡${mBk.toLocaleString('es-CR')} | Confianza: ${stars(mp)}\n  Por qué: Cobertura dual ofensiva (gol + asistencia)`;
+    bA = `🔴 AGRESIVA\n  Mercado: Parlay Gol + Asistencia + Tiro\n  Apuesta: ${player.name} Anota + Asiste + 2+ Tiros\n  Prob: ${Math.round(agp * 100)}% | Cuota: ${aO} | Kelly: ${aK}% (fraccional 25%)\n  Apostar: ₡${aBk.toLocaleString('es-CR')} | Confianza: ${stars(agp)}\n  Por qué: Alto retorno potencial ₡${Math.round(aBk * aO).toLocaleString('es-CR')}. Riesgo alto.\n\n💰 BANKROLL (₡${br.toLocaleString('es-CR')}):\n  Conservadora ₡${cBk.toLocaleString('es-CR')} | Moderada ₡${mBk.toLocaleString('es-CR')} | Agresiva ₡${aBk.toLocaleString('es-CR')}\n  Total si juegas las 3: ₡${(cBk + mBk + aBk).toLocaleString('es-CR')}`;
   }
 
-  return null;
+  return [
+    `🏆 ${(player.name || playerData.player?.name || 'Jugador').toUpperCase()} | ${player.team || '—'} | ${player.position || '—'}`,
+    matchLine,
+    `📊 Temporada: ${seasonStats?.goals || 0} goles, ${seasonStats?.assists || 0} asist, ${seasonStats?.appearances || 0} partidos | 🎯 Prob. gol: ${Math.round((probabilities?.goal || 0.3) * 100)}%`,
+    '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
+    '🎯 MIS 3 MEJORES APUESTAS',
+    '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
+    bC, '', bM, '', bA,
+    '',
+    '⚠️ Estimaciones basadas en estadísticas de temporada. Apuesta responsablemente.'
+  ].join('\n');
 }
 
 /**
@@ -868,43 +941,48 @@ export default async function handler(req, res) {
     }
 
     // =====================================================
-    // 2.0.1 DETECT PLAYER AND ANALYZE (NEW)
+    // 2.0.1 DETECT SUBJECT: jugador, equipo de club, o selección
     // =====================================================
     let playerAnalyzed = null;
+    let teamAnalyzed = null;
     let playerBettingSuggestions = null;
-    const detectedPlayerName = detectPlayerInMessage(sanitizedMessage);
 
-    if (detectedPlayerName) {
-      console.log(`[chat] 🎯 Player detected: "${detectedPlayerName}"`);
+    const detectedSubject = detectSubjectInMessage(sanitizedMessage);
+    console.log(`[chat] 🔍 Detected subject:`, detectedSubject);
+
+    if (detectedSubject) {
       try {
-        playerAnalyzed = await analyzePlayer(detectedPlayerName);
-        console.log(`[chat] analyzePlayer() returned:`, { success: playerAnalyzed?.success, hasPlayer: !!playerAnalyzed?.player, playerName: playerAnalyzed?.player?.name, hasBets: !!playerAnalyzed?.bets });
+        if (detectedSubject.type === 'player') {
+          // --- Jugador individual ---
+          console.log(`[chat] 🎯 Player: "${detectedSubject.name}"`);
+          playerAnalyzed = await analyzePlayer(detectedSubject.name);
 
-        if (playerAnalyzed && playerAnalyzed.player) {
-          console.log(`[chat] ✅ Player analysis (${playerAnalyzed.success ? 'real' : 'fallback'}): ${playerAnalyzed.player.name}`);
-          // Use bets directly from analyzePlayer (now has 3 bets: conservative, moderate, aggressive)
-          if (playerAnalyzed.bets) {
-            console.log(`[chat] 📊 Got player betting suggestions from analyzer`);
-            // Transform bets into suggestion format compatible with the rest of the code
+          if (playerAnalyzed?.player && playerAnalyzed?.bets) {
             playerBettingSuggestions = {
               player: playerAnalyzed.player.name,
               options: [
-                { ...playerAnalyzed.bets.conservative, profile: 'Conservative', risk: 'bajo' },
-                { ...playerAnalyzed.bets.moderate, profile: 'Moderate', risk: 'medio' },
-                { ...playerAnalyzed.bets.aggressive, profile: 'Aggressive', risk: 'alto' }
+                { ...playerAnalyzed.bets.conservative, profile: 'Conservadora', risk: 'bajo' },
+                { ...playerAnalyzed.bets.moderate, profile: 'Moderada', risk: 'medio' },
+                { ...playerAnalyzed.bets.aggressive, profile: 'Agresiva', risk: 'alto' }
               ]
             };
           }
-        } else {
-          console.warn(`[chat] ⚠️ No player data returned from analyzePlayer()`);
+
+        } else if (detectedSubject.type === 'club_team') {
+          // --- Equipo de club ---
+          console.log(`[chat] 🏟️ Club team: "${detectedSubject.name}"`);
+          teamAnalyzed = await analyzeTeam(detectedSubject.name, false);
+
+        } else if (detectedSubject.type === 'national_team') {
+          // --- Selección nacional ---
+          console.log(`[chat] 🌍 National team: "${detectedSubject.name}"`);
+          teamAnalyzed = await analyzeTeam(detectedSubject.name, true);
         }
-      } catch (playerError) {
-        console.warn(`[chat] ⚠️ Player analysis failed: ${playerError.message}`);
-        console.error(`[chat] Stack:`, playerError.stack);
-        // Continue anyway - not critical
+      } catch (subjectError) {
+        console.warn(`[chat] ⚠️ Subject analysis failed: ${subjectError.message}`);
       }
     } else {
-      console.log(`[chat] ℹ️ No player detected in message`);
+      console.log(`[chat] ℹ️ No specific subject detected`);
     }
 
     // =====================================================
@@ -1016,6 +1094,23 @@ FERXXXA DORADOBET INTELLIGENCE: Temporarily unavailable (${e.message})
 
     // Append FerXxxa context to userContext
     userContext += ferxxxaContext;
+
+    // =====================================================
+    // 2.2 Inject player analysis into system prompt if detected
+    // =====================================================
+    let playerFormattedResponse = null;
+    let teamFormattedResponse = null;
+
+    if (playerAnalyzed) {
+      playerFormattedResponse = formatPlayerResponse(playerAnalyzed, bankroll || 50000);
+      userContext += `\n\nJUGADOR ANALIZADO (usa estos datos):\n${playerFormattedResponse}`;
+    }
+
+    if (teamAnalyzed) {
+      teamFormattedResponse = formatTeamResponse(teamAnalyzed, bankroll || 50000);
+      const label = teamAnalyzed.type === 'national_team' ? 'SELECCIÓN ANALIZADA' : 'EQUIPO ANALIZADO';
+      userContext += `\n\n${label} (usa estos datos):\n${teamFormattedResponse}`;
+    }
 
     // Build final system prompt with all placeholders
     let systemPrompt = (SYSTEM_PROMPTS[language] || SYSTEM_PROMPTS.es)
@@ -1275,22 +1370,36 @@ FERXXXA DORADOBET INTELLIGENCE: Temporarily unavailable (${e.message})
       tool_calls: executedTools,
       bankroll_impact: bankrollImpact > 0 ? Math.round(bankrollImpact * 10000) / 100 : null,
       language: language,
-      // ===== NEW: Player Analysis Context =====
+      // ===== Player / Team / National Team Analysis =====
+      player_response: playerFormattedResponse,
+      team_response: teamFormattedResponse,
       player_analyzed: playerAnalyzed ? {
         name: playerAnalyzed.player.name,
         team: playerAnalyzed.player.team,
         position: playerAnalyzed.player.position,
         seasonStats: playerAnalyzed.seasonStats,
         probabilities: playerAnalyzed.probabilities,
-        form: playerAnalyzed.form
+        form: playerAnalyzed.form,
+        nextMatch: playerAnalyzed.nextMatch || null,
+        bets: playerAnalyzed.bets || null
       } : null,
-      player_suggestions: playerBettingSuggestions ? playerBettingSuggestions : null,
+      team_analyzed: teamAnalyzed ? {
+        type: teamAnalyzed.type,
+        name: teamAnalyzed.team.name,
+        recentForm: teamAnalyzed.recentForm,
+        probabilities: teamAnalyzed.probabilities,
+        nextMatch: teamAnalyzed.nextMatch || null,
+        bets: teamAnalyzed.bets || null
+      } : null,
+      player_suggestions: playerBettingSuggestions || null,
+      subject_detected: detectedSubject,
       ferxxxa_intel: {
         ...ferxxxaMetadata,
         markets_available: !!ferxxxaMarkets,
         community_available: !!ferxxxaCommunity,
         parlays_count: generatedParlays.length,
-        player_analysis_enabled: !!playerAnalyzed
+        player_analysis_enabled: !!playerAnalyzed,
+        team_analysis_enabled: !!teamAnalyzed
       }
     }, 'Analysis complete with player-specific or generic parlays');
 
@@ -1301,3 +1410,4 @@ FERXXXA DORADOBET INTELLIGENCE: Temporarily unavailable (${e.message})
     });
   }
 }
+
