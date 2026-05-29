@@ -1,13 +1,21 @@
 // ============================================================
-// Rebuild trigger: 2026-05-23 22:15:00
-//  Chat Endpoint - Groq LLM Integration for IA-Zak v3.0
+// Rebuild trigger: 2026-05-28 AI-Zak Reconfiguration v6.0
+//  Chat Endpoint - Groq LLM Integration for IA-Zak v6.0
 //  - FerXxxa Intel Integration: Receives DoradoBet chat context
-//  - Processes user messages, maintains conversation history,
-//  - Executes tools, and returns betting recommendations
+//  - Kelly Criterion + 3 Risk Profiles (Conservador/Moderado/Agresivo)
+//  - Bankroll management in Colones (₡)
+//  - Intelligent parlay generation with Spanish analysis
 // ============================================================
 
 import Groq from 'groq-sdk';
 import { getDb } from './_db.js';
+import {
+  calculateKellyOptimal,
+  calculateKellyFractional,
+  calculateBetSize,
+  calculateRiskOfRuin,
+  calculateEdge
+} from '../js/kelly_calculator.js';
 
 // Inline simple utility functions to avoid middleware import issues
 const sanitizeInput = (input) => {
@@ -130,6 +138,7 @@ function calculateRiskOfRuin(kellyPercentage, bankroll) {
 /**
  * ========================================================================
  * Generate 5 Intelligent Parlays with varying risk profiles
+ * Enhanced with Visual Breakdown (DoradoBet style)
  * ========================================================================
  */
 function generateParlay(rank, profile, bankroll, markets, communityData) {
@@ -227,6 +236,28 @@ function generateParlay(rank, profile, bankroll, markets, communityData) {
   const riskOfRuin = calculateRiskOfRuin(kellyCalc, bankroll);
   const expectedWin = bankrollAmount * (combinedOdds - 1);
 
+  // Build visual breakdown (DoradoBet style)
+  const breakdown = [
+    {
+      type: 'header',
+      profile: prof.name,
+      odds: Math.round(combinedOdds * 100) / 100,
+      bankroll: bankrollAmount
+    },
+    ...events.map(e => ({
+      type: 'event',
+      market: e.market,
+      prediction: e.prediction,
+      odds: e.odds
+    })),
+    {
+      type: 'summary',
+      stake: bankrollAmount,
+      potential_win: Math.round(expectedWin),
+      total_odds: Math.round(combinedOdds * 100) / 100
+    }
+  ];
+
   return {
     rank,
     name: `${prof.name} - ${events.slice(0, 2).map(e => e.prediction).join(' + ')}`,
@@ -247,6 +278,16 @@ function generateParlay(rank, profile, bankroll, markets, communityData) {
     combined_odds: Math.round(combinedOdds * 100) / 100,
     edge_calculation: `${Math.round((calculateKelly(combinedProb, combinedOdds) * 100) * 10) / 10}%`,
     detailed_reasoning: generateParrayReasoning(profile, events, prof.risk),
+    // VISUAL BREAKDOWN (DoradoBet style for UI rendering)
+    visual_breakdown: breakdown,
+    breakdown_text: `
+CREAR APUESTA - ${prof.name}
+${events.map(e => `• ${e.market}\n  ${e.prediction} (${e.odds}x)`).join('\n')}
+
+Apuesta: ₡${bankrollAmount.toLocaleString('es-CR')}
+Cuota Total: ${Math.round(combinedOdds * 100) / 100}
+Ganancia Potencial: ₡${Math.round(expectedWin).toLocaleString('es-CR')}
+    `,
     community_consensus: {
       consensus_bets: 'Market-driven analysis',
       community_frequency: `${Math.round(Math.random() * 60) + 20}%`,

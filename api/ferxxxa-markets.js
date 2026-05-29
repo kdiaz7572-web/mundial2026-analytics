@@ -1,68 +1,76 @@
 /**
  * ============================================================
- * FerXxxa Markets Scraper - Real-time DoradoBet Odds
+ * FerXxxa Markets - Real-time Betting Odds via OddsPapi
  * ============================================================
- * Extracts 67+ betting markets from DoradoBet every 5 minutes
- * using browser automation + HTML parsing. Stores in Postgres.
+ * Extracts 67+ betting markets from 350+ bookmakers (OddsPapi)
+ * including Latin American coverage every 5 minutes.
+ * Stores in Postgres for IA-Zak consumption.
  *
  * Usage (from vercel.json cron):
- *   GET /api/ferxxxa-markets?match_id=partido_id
+ *   GET /api/ferxxxa-markets?fixture_id=partido_id
  *
- * Technology: Playwright (fastest browser automation for Vercel)
+ * Data Source: OddsPapi (https://oddspapi.io)
+ *   - 350+ bookmakers (Bet365, DraftKings, FanDuel, Betfair, etc.)
+ *   - LatAm coverage (Betcris, Marathonbet, and more)
+ *   - Real-time odds updates
+ *   - Legal & authorized API access (no ToS violations)
  */
 
-import { chromium } from 'playwright';
+import { getMatchMarkets } from './oddspapi-client.js';
 import { getDb } from './_db.js';
-import { createClient } from '@vercel/kv';
-
-// KV store for caching (1 hour max)
-const kv = createClient({
-  url: process.env.KV_REST_API_URL,
-  token: process.env.KV_REST_API_TOKEN
-});
 
 /**
- * Validate odds are within reasonable bounds
+ * Validate fixture ID format
  */
-function validateOdds(odds) {
-  const num = parseFloat(odds);
-  if (isNaN(num)) return null;
-  if (num < 1.01 || num > 1000) return null;
-  return Math.round(num * 100) / 100;
+function validateFixtureId(fixtureId) {
+  if (!fixtureId || typeof fixtureId !== 'string') {
+    return false;
+  }
+  return fixtureId.length > 0;
 }
 
 /**
- * Main scraping function with fallback strategy
+ * Main function: Fetch real market data from OddsPapi
  */
-async function scrapeDoradoBetMarkets(matchId) {
+async function fetchRealMarkets(fixtureId, matchInfo = {}) {
   try {
-    // Credentials from environment
-    const user = process.env.DORADOBET_USER;
-    const pass = process.env.DORADOBET_PASS;
+    console.log(`[FerXxxa] Fetching real markets for fixture ${fixtureId} from OddsPapi...`);
 
-    if (!user || !pass) {
-      console.warn('[ferxxxa-markets] No credentials. Using fallback.');
-      return generateFallbackData(matchId);
+    // Call OddsPapi client to get real odds from 350+ bookmakers
+    const marketsData = await getMatchMarkets(fixtureId, matchInfo);
+
+    if (!marketsData) {
+      console.warn(`[FerXxxa] OddsPapi returned no data. Returning fallback.`);
+      return generateFallbackData(fixtureId, matchInfo);
     }
 
-    // Browser automation would go here
-    // For now, return realistic fallback data
-    return generateFallbackData(matchId);
+    return {
+      extraction_timestamp: new Date().toISOString(),
+      fixture_id: fixtureId,
+      home_team: matchInfo.home_team || 'Home',
+      away_team: matchInfo.away_team || 'Away',
+      ...marketsData,
+      data_source: 'OddsPapi (350+ bookmakers, real-time)',
+      fallback: false
+    };
   } catch (error) {
-    console.error('[ferxxxa-markets] Error:', error.message);
-    return generateFallbackData(matchId);
+    console.error('[FerXxxa] Error fetching real markets:', error.message);
+    return generateFallbackData(fixtureId, matchInfo);
   }
 }
 
 /**
- * Generate realistic fallback market data
+ * Generate realistic fallback market data (for testing/offline mode)
+ * This is returned ONLY if OddsPapi fails
  */
-function generateFallbackData(matchId) {
+function generateFallbackData(fixtureId, matchInfo = {}) {
+  console.warn(`[FerXxxa] Using fallback data for fixture ${fixtureId} (OddsPapi unavailable)`);
+
   return {
     extraction_timestamp: new Date().toISOString(),
-    match_id: matchId,
-    home_team: 'Home Team',
-    away_team: 'Away Team',
+    fixture_id: fixtureId,
+    home_team: matchInfo.home_team || 'Home Team',
+    away_team: matchInfo.away_team || 'Away Team',
     current_score: '0:0',
     current_minute: 0,
     total_markets_found: 67,
@@ -94,8 +102,9 @@ function generateFallbackData(matchId) {
     },
     data_quality: {
       markets_extracted: 67,
-      odds_freshness_seconds: 5,
+      odds_freshness_seconds: 60,
       last_update: new Date().toISOString(),
+      source: 'Fallback (OddsPapi unavailable)',
       live_match: false,
       fallback: true
     }
@@ -104,6 +113,10 @@ function generateFallbackData(matchId) {
 
 /**
  * Vercel handler
+ * Endpoint: GET /api/ferxxxa-markets?fixture_id=123
+ *
+ * Called every 5 minutes by vercel.json cron job
+ * Returns real odds from 350+ bookmakers (OddsPapi)
  */
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -114,37 +127,59 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { match_id } = req.query;
-    if (!match_id) {
-      return res.status(400).json({ error: 'match_id required' });
+    const { fixture_id, match_id } = req.query;
+    const fixtureId = fixture_id || match_id; // Support both parameter names
+
+    if (!fixtureId) {
+      return res.status(400).json({
+        error: 'fixture_id or match_id parameter required',
+        example: '/api/ferxxxa-markets?fixture_id=123'
+      });
     }
 
-    const marketData = await scrapeDoradoBetMarkets(match_id);
+    if (!validateFixtureId(fixtureId)) {
+      return res.status(400).json({ error: 'Invalid fixture_id format' });
+    }
 
-    // Store in Postgres
+    // Fetch REAL market data from OddsPapi (350+ bookmakers)
+    // Falls back to simulated data only if OddsPapi is unavailable
+    const marketData = await fetchRealMarkets(fixtureId, {
+      home_team: req.query.home_team,
+      away_team: req.query.away_team
+    });
+
+    // Store in Postgres for IA-Zak to read
     try {
       const db = await getDb();
       await db`
         INSERT INTO zak_intel (topic, match_id, studied_at, summary_json, content)
-        VALUES ('ferxxxa_markets', ${match_id}, NOW(), ${JSON.stringify(marketData)}, 'Real-time market data from DoradoBet')
+        VALUES ('ferxxxa_markets', ${fixtureId}, NOW(), ${JSON.stringify(marketData)}, 'Real-time market data from OddsPapi (350+ bookmakers)')
         ON CONFLICT (topic, match_id) DO UPDATE SET
           summary_json = ${JSON.stringify(marketData)},
           studied_at = NOW()
       `;
+      console.log(`[FerXxxa] Stored markets for fixture ${fixtureId} in DB`);
     } catch (dbError) {
-      console.error('[ferxxxa-markets] Database error:', dbError.message);
+      console.error('[FerXxxa] Database storage error:', dbError.message);
+      // Continue anyway - return data even if DB fails
     }
 
     return res.status(200).json({
       success: true,
+      fixture_id: fixtureId,
       data: marketData,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      note: marketData.fallback ? '⚠️ Using fallback data (OddsPapi unavailable)' : '✅ Real odds from OddsPapi'
     });
 
   } catch (error) {
-    console.error('[ferxxxa-markets] Error:', error);
-    return res.status(500).json({ success: false, error: error.message, fallback: true });
+    console.error('[FerXxxa] Unhandled error:', error);
+    return res.status(500).json({
+      success: false,
+      error: error.message,
+      fallback: true
+    });
   }
 }
 
-export { scrapeDoradoBetMarkets, validateOdds };
+export { fetchRealMarkets, validateFixtureId, generateFallbackData };
