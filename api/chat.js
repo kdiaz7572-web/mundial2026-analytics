@@ -1038,30 +1038,67 @@ FERXXXA DORADOBET INTELLIGENCE: Temporarily unavailable (${e.message})
       });
 
       // Generate fallback parlays when Groq fails
-      const parlayProfiles = ['conservative', 'moderate', 'aggressive', 'very_aggressive', 'community_pick'];
-      const fallbackParlays = parlayProfiles.map((profile, index) => {
-        return generateParlay(
-          index + 1,
-          profile,
-          bankroll || 50000,
-          ferxxxaMarkets,
-          ferxxxaCommunity
-        );
-      });
+      // BUT: If player was analyzed, use player-specific suggestions instead
+      let fallbackParlays;
+      let fallbackMessage;
+
+      if (playerBettingSuggestions && playerAnalyzed) {
+        // Use player-specific suggestions even though Groq failed
+        console.log(`[chat] 📊 Groq failed but using player suggestions instead`);
+        fallbackParlays = playerBettingSuggestions.options.map((option, index) => ({
+          rank: index + 1,
+          name: `${option.profile} - ${option.prediction}`,
+          risk_profile: option.riskLevel.toLowerCase().replace(/[^a-z_]/g, ''),
+          kelly_percentage: parseFloat(option.kelly) || (4 + index * 3),
+          bankroll_amount_colones: option.bankrollSuggestion
+            ? parseInt(option.bankrollSuggestion.replace(/[^\d]/g, '')) || (3000 + index * 2000)
+            : (3000 + index * 2000),
+          combined_probability: parseFloat(option.probability) || 0.5,
+          combined_odds: parseFloat(option.estimatedOdds) || (2.0 + index * 0.5),
+          prediction: option.prediction,
+          market: option.market,
+          detailed_reasoning: option.reasoning,
+          confidence: option.confidence
+        }));
+        fallbackMessage = `Análisis específico de ${playerAnalyzed.player.name} (IA-Zak sin conexión a Groq)`;
+      } else {
+        // Generic fallback parlays
+        const parlayProfiles = ['conservative', 'moderate', 'aggressive', 'very_aggressive', 'community_pick'];
+        fallbackParlays = parlayProfiles.map((profile, index) => {
+          return generateParlay(
+            index + 1,
+            profile,
+            bankroll || 50000,
+            ferxxxaMarkets,
+            ferxxxaCommunity
+          );
+        });
+        fallbackMessage = 'IA-Zak está temporalmente offline. Intenta de nuevo en un momento.';
+      }
 
       // Fallback: return basic response without LLM
       return sendSuccess(res, {
-        response: 'IA-Zak está temporalmente offline. Intenta de nuevo en un momento.',
-        reasoning_chain: ['Intentando conectar con Groq...', 'Servicio no disponible', 'Retornando respuesta de fallback'],
+        response: fallbackMessage,
+        reasoning_chain: playerBettingSuggestions
+          ? [`Jugador detectado: ${playerAnalyzed.player.name}`, 'Análisis completado', 'Groq offline - usando análisis local']
+          : ['Intentando conectar con Groq...', 'Servicio no disponible', 'Retornando respuesta de fallback'],
         recommendations: [],
         kelly_calculations: null,
         recommended_parlays: fallbackParlays,
-        data_sources_used: [],
-        confidence: 'low',
+        data_sources_used: playerBettingSuggestions ? ['player-analyzer'] : [],
+        confidence: playerBettingSuggestions ? 'medium' : 'low',
         tool_calls: [],
         fallback: true,
-        ferxxxa_intel: ferxxxaMetadata
-      }, 'IA-Zak fallback mode');
+        ferxxxa_intel: ferxxxaMetadata,
+        player_analyzed: playerAnalyzed ? {
+          name: playerAnalyzed.player.name,
+          team: playerAnalyzed.player.team,
+          position: playerAnalyzed.player.position,
+          seasonStats: playerAnalyzed.seasonStats,
+          probabilities: playerAnalyzed.probabilities,
+          form: playerAnalyzed.form
+        } : null
+      }, 'IA-Zak fallback mode (Groq offline)');
     }
 
     // =====================================================
