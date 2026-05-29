@@ -878,13 +878,23 @@ export default async function handler(req, res) {
       console.log(`[chat] 🎯 Player detected: "${detectedPlayerName}"`);
       try {
         playerAnalyzed = await analyzePlayer(detectedPlayerName);
-        console.log(`[chat] analyzePlayer() returned:`, { success: playerAnalyzed?.success, hasPlayer: !!playerAnalyzed?.player, playerName: playerAnalyzed?.player?.name });
+        console.log(`[chat] analyzePlayer() returned:`, { success: playerAnalyzed?.success, hasPlayer: !!playerAnalyzed?.player, playerName: playerAnalyzed?.player?.name, hasBets: !!playerAnalyzed?.bets });
 
         if (playerAnalyzed && playerAnalyzed.player) {
           console.log(`[chat] ✅ Player analysis (${playerAnalyzed.success ? 'real' : 'fallback'}): ${playerAnalyzed.player.name}`);
-          // Generate betting suggestions for this player
-          playerBettingSuggestions = generatePlayerBettingSuggestions(playerAnalyzed);
-          console.log(`[chat] 📊 Generated player betting suggestions`, { optionsCount: playerBettingSuggestions?.options?.length });
+          // Use bets directly from analyzePlayer (now has 3 bets: conservative, moderate, aggressive)
+          if (playerAnalyzed.bets) {
+            console.log(`[chat] 📊 Got player betting suggestions from analyzer`);
+            // Transform bets into suggestion format compatible with the rest of the code
+            playerBettingSuggestions = {
+              player: playerAnalyzed.player.name,
+              options: [
+                { ...playerAnalyzed.bets.conservative, profile: 'Conservative', risk: 'bajo' },
+                { ...playerAnalyzed.bets.moderate, profile: 'Moderate', risk: 'medio' },
+                { ...playerAnalyzed.bets.aggressive, profile: 'Aggressive', risk: 'alto' }
+              ]
+            };
+          }
         } else {
           console.warn(`[chat] ⚠️ No player data returned from analyzePlayer()`);
         }
@@ -1045,21 +1055,23 @@ FERXXXA DORADOBET INTELLIGENCE: Temporarily unavailable (${e.message})
       if (playerBettingSuggestions && playerAnalyzed) {
         // Use player-specific suggestions even though Groq failed
         console.log(`[chat] 📊 Groq failed but using player suggestions instead`);
-        fallbackParlays = playerBettingSuggestions.options.map((option, index) => ({
-          rank: index + 1,
-          name: `${option.profile} - ${option.prediction}`,
-          risk_profile: option.riskLevel.toLowerCase().replace(/[^a-z_]/g, ''),
-          kelly_percentage: parseFloat(option.kelly) || (4 + index * 3),
-          bankroll_amount_colones: option.bankrollSuggestion
-            ? parseInt(option.bankrollSuggestion.replace(/[^\d]/g, '')) || (3000 + index * 2000)
-            : (3000 + index * 2000),
-          combined_probability: parseFloat(option.probability) || 0.5,
-          combined_odds: parseFloat(option.estimatedOdds) || (2.0 + index * 0.5),
-          prediction: option.prediction,
-          market: option.market,
-          detailed_reasoning: option.reasoning,
-          confidence: option.confidence
-        }));
+        fallbackParlays = playerBettingSuggestions.options.map((option, index) => {
+          const bankroll = parseInt(option.bankrollSuggestion?.replace(/[^\d]/g, '')) || (3000 + index * 2000);
+          return {
+            rank: index + 1,
+            name: `${option.label || option.profile} - ${option.prediction}`,
+            risk_profile: option.risk || 'moderate',
+            kelly_percentage: option.kelly_pct || (4 + index * 3),
+            bankroll_amount_colones: bankroll,
+            expected_win_colones: Math.round(bankroll * option.estimated_odds),
+            combined_probability: option.probability || 0.5,
+            combined_odds: option.estimated_odds || (2.0 + index * 0.5),
+            prediction: option.prediction,
+            market: option.market,
+            detailed_reasoning: option.reasoning,
+            confidence: option.confidence
+          };
+        });
         fallbackMessage = `Análisis específico de ${playerAnalyzed.player.name} (IA-Zak sin conexión a Groq)`;
       } else {
         // Generic fallback parlays
@@ -1151,30 +1163,32 @@ FERXXXA DORADOBET INTELLIGENCE: Temporarily unavailable (${e.message})
       console.log(`[chat] 🎯 Using player-specific betting suggestions (detected: ${playerAnalyzed.player.name})`);
 
       // Transform player suggestions into parlay-like format
-      generatedParlays = playerBettingSuggestions.options.map((option, index) => ({
-        rank: index + 1,
-        name: `${option.profile} - ${option.prediction}`,
-        risk_profile: option.riskLevel.toLowerCase().replace(/[^a-z_]/g, ''),
-        kelly_percentage: parseFloat(option.kelly) || (4 + index * 3),
-        bankroll_amount_colones: option.bankrollSuggestion
-          ? parseInt(option.bankrollSuggestion.replace(/[^\d]/g, '')) || (3000 + index * 2000)
-          : (3000 + index * 2000),
-        combined_probability: parseFloat(option.probability) || 0.5,
-        combined_odds: parseFloat(option.estimatedOdds) || (2.0 + index * 0.5),
-        prediction: option.prediction,
-        market: option.market,
-        detailed_reasoning: option.reasoning,
-        confidence: option.confidence,
-        events: [
-          {
-            market: option.market,
-            prediction: option.prediction,
-            your_probability: parseFloat(option.probability) || 0.5,
-            odds: parseFloat(option.estimatedOdds) || (2.0 + index * 0.5),
-            source: 'player_analyzer'
-          }
-        ]
-      }));
+      generatedParlays = playerBettingSuggestions.options.map((option, index) => {
+        const bankroll = parseInt(option.bankrollSuggestion?.replace(/[^\d]/g, '')) || (3000 + index * 2000);
+        return {
+          rank: index + 1,
+          name: `${option.label || option.profile} - ${option.prediction}`,
+          risk_profile: option.risk || 'moderate',
+          kelly_percentage: option.kelly_pct || (4 + index * 3),
+          bankroll_amount_colones: bankroll,
+          expected_win_colones: Math.round(bankroll * option.estimated_odds),
+          combined_probability: option.probability || 0.5,
+          combined_odds: option.estimated_odds || (2.0 + index * 0.5),
+          prediction: option.prediction,
+          market: option.market,
+          detailed_reasoning: option.reasoning,
+          confidence: option.confidence,
+          events: [
+            {
+              market: option.market,
+              prediction: option.prediction,
+              your_probability: option.probability || 0.5,
+              odds: option.estimated_odds || (2.0 + index * 0.5),
+              source: 'player_analyzer'
+            }
+          ]
+        };
+      });
 
       usePlayerSuggestions = true;
       console.log(`[chat] ✅ Generated ${generatedParlays.length} player-specific betting suggestions`);
