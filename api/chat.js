@@ -1,5 +1,5 @@
 // ============================================================
-// Rebuild trigger: 2026-05-28 AI-Zak Reconfiguration v6.0
+// Rebuild trigger: 2026-05-29 AI-Zak Fase 3 - calculos enriquecidos
 //  Chat Endpoint - Groq LLM Integration for IA-Zak v6.0
 //  - FerXxxa Intel Integration: Receives DoradoBet chat context
 //  - Kelly Criterion + 3 Risk Profiles (Conservador/Moderado/Agresivo)
@@ -1205,5 +1205,6 @@ FERXXXA DORADOBET INTELLIGENCE: Temporarily unavailable (${e.message})
     });
   }
 }
+
 
 
