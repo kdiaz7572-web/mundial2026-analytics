@@ -1036,9 +1036,9 @@ export default async function handler(req, res) {
             playerBettingSuggestions = {
               player: playerAnalyzed.player.name,
               options: [
-                { ...playerAnalyzed.bets.conservative, profile: 'Conservadora', risk: 'bajo' },
-                { ...playerAnalyzed.bets.moderate, profile: 'Moderada', risk: 'medio' },
-                { ...playerAnalyzed.bets.aggressive, profile: 'Agresiva', risk: 'alto' }
+                { ...playerAnalyzed.bets.conservative, profile: 'Conservadora', risk: 'conservative' },
+                { ...playerAnalyzed.bets.moderate, profile: 'Moderada', risk: 'moderate' },
+                { ...playerAnalyzed.bets.aggressive, profile: 'Agresiva', risk: 'aggressive' }
               ]
             };
           }

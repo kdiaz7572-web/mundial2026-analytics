@@ -336,9 +336,16 @@ const ChatUI = {
       'community_pick': { borderColor: '#3b82f6', labelColor: '#93c5fd', icon: '👥', label: 'CONSENSO' }
     };
 
+    // Normalize profile aliases (bajo/medio/alto → conservative/moderate/aggressive)
+    const profileAliases = { bajo: 'conservative', medio: 'moderate', alto: 'aggressive', moderada: 'moderate', conservadora: 'conservative', agresiva: 'aggressive' };
+    const normalizeParlays = parlays.map((p, i) => {
+      const rawProfile = (p.risk_profile || '').toLowerCase();
+      return { ...p, risk_profile: profileAliases[rawProfile] || p.risk_profile || ['conservative','moderate','aggressive','very_aggressive','community_pick'][i] || 'conservative' };
+    });
+
     // Show first 3 main profiles + extra button to expand
-    const topParlays = parlays.slice(0, 3);
-    const extraCount = parlays.length - 3;
+    const topParlays = normalizeParlays.slice(0, 3);
+    const extraCount = normalizeParlays.length - 3;
 
     let gridHtml = `
     <div class="mt-4">
