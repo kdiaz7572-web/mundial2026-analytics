@@ -331,11 +331,294 @@ function generateParrayReasoning(profile, events, riskDesc) {
  * ========================================================================
  * Detect Player Name in User Message
  * ========================================================================
- * Returns { type, name, displayName } for player, club_team, or national_team
- * Delegates to detectSubject() from team-analyzer.js
  */
 function detectSubjectInMessage(message) {
   return detectSubject(message);
+}
+
+/**
+ * ========================================================================
+ * MARKET INTENT DETECTOR — NLP Quirúrgico
+ * ========================================================================
+ * Detecta exactamente QUÉ mercado pregunta el usuario.
+ * Si pregunta por tarjetas → NUNCA generar 1x2.
+ * Si pregunta por córners → NUNCA generar resultado.
+ *
+ * Returns: {
+ *   market:   'cards' | 'corners' | 'goals' | 'btts' | 'player_goals' |
+ *             'player_cards' | 'player_shots' | 'asian_handicap' |
+ *             'exact_score' | '1x2' | 'general'
+ *   subtype:  string (más específico)
+ *   entities: { players: [], teams: [], number: null }
+ *   mustAvoid: [] // mercados PROHIBIDOS en la respuesta
+ * }
+ */
+function detectMarketInMessage(message) {
+  const msg = message.toLowerCase()
+    .normalize('NFD').replace(/[̀-ͯ]/g, ''); // strip accents
+
+  // ── Patrón de número en mensaje (ej: "mas de 3", "over 4.5") ──
+  const numberMatch = msg.match(/(?:over|under|mas de|menos de|over|bajo|alto|más de|menos de)\s*([\d.]+)/i);
+  const threshold = numberMatch ? parseFloat(numberMatch[1]) : null;
+
+  // ── Patrones de mercado en ORDEN DE ESPECIFICIDAD (más específico primero) ──
+  const rules = [
+    // Jugador específico
+    {
+      market: 'player_goals',
+      patterns: [/gol de \w/, /anota \w/, /marque \w/, /score.*\w{4}/, /primer gol/, /ultimo gol/, /doblete/, /hat.?trick/],
+      mustAvoid: ['1x2', 'corners', 'cards'],
+      label: 'Goles de Jugador'
+    },
+    {
+      market: 'player_cards',
+      patterns: [/tarjeta.*(?:para|a|de) \w/, /amonestado/, /expulsado/, /sera amarill/, /ve.?a la ducha/],
+      mustAvoid: ['1x2', 'corners', 'goals'],
+      label: 'Tarjetas de Jugador'
+    },
+    {
+      market: 'player_shots',
+      patterns: [/tiros.*jugador/, /disparos.*de \w/, /tiro.*al arco/, /shots.*on target/],
+      mustAvoid: ['1x2', 'corners'],
+      label: 'Tiros de Jugador'
+    },
+
+    // Mercados de partido — tarjetas
+    {
+      market: 'cards',
+      patterns: [/tarjeta/, /amarilla/, /roja/, /amonestaci/, /cartulina/, /card/, /faltas/, /disciplin/],
+      mustAvoid: ['1x2', 'corners', 'exact_score'],
+      label: 'Tarjetas'
+    },
+
+    // Córners
+    {
+      market: 'corners',
+      patterns: [/corner/, /corner/, /esquina/, /tiro de esquina/, /saques de esquina/],
+      mustAvoid: ['1x2', 'cards', 'exact_score'],
+      label: 'Córners'
+    },
+
+    // Resultado exacto
+    {
+      market: 'exact_score',
+      patterns: [/marcador exacto/, /resultado exacto/, /score exacto/, /termina \d/, /acaba \d/],
+      mustAvoid: ['corners', 'cards'],
+      label: 'Marcador Exacto'
+    },
+
+    // BTTS
+    {
+      market: 'btts',
+      patterns: [/ambos anotan/, /ambos marcan/, /los dos anotan/, /btts/, /both teams score/, /que ambos/],
+      mustAvoid: ['corners', 'cards', 'exact_score'],
+      label: 'Ambos Anotan'
+    },
+
+    // Hándicap asiático
+    {
+      market: 'asian_handicap',
+      patterns: [/handicap/, /asiatica/, /linea asiatica/, /ventaja/, /handicap/, /spread/],
+      mustAvoid: ['corners', 'cards'],
+      label: 'Hándicap Asiático'
+    },
+
+    // Total de goles (Over/Under)
+    {
+      market: 'total_goals',
+      patterns: [/over \d/, /under \d/, /mas de \d/, /menos de \d/, /total.*goles/, /goles del partido/, /cuantos goles/, /cuantos goles/],
+      mustAvoid: ['corners', 'cards', '1x2'],
+      label: 'Total de Goles'
+    },
+
+    // Resultado 1x2
+    {
+      market: '1x2',
+      patterns: [/quien gana/, /quién gana/, /resultado del partido/, /victoria/, /ganador del partido/, /\b1x2\b/, /gana el partido/, /que equipo gana/],
+      mustAvoid: ['corners', 'cards'],
+      label: 'Resultado 1x2'
+    }
+  ];
+
+  for (const rule of rules) {
+    for (const pattern of rule.patterns) {
+      if (pattern.test(msg)) {
+        console.log(`[market-detect] Detected: ${rule.market} via pattern ${pattern}`);
+        return {
+          market: rule.market,
+          subtype: rule.market,
+          label: rule.label,
+          threshold,
+          mustAvoid: rule.mustAvoid,
+          raw: msg
+        };
+      }
+    }
+  }
+
+  // Default: pregunta general sobre partido → todos los mercados
+  return {
+    market: 'general',
+    subtype: 'all_markets',
+    label: 'Análisis General',
+    threshold: null,
+    mustAvoid: [],
+    raw: msg
+  };
+}
+
+/**
+ * ========================================================================
+ * CONTEXT EXTRACTOR — Extrae partido activo de historial de conversación
+ * ========================================================================
+ * Si el usuario pregunta "¿y para tarjetas?" sin mencionar partido,
+ * busca el último partido mencionado en el historial.
+ */
+function extractMatchContext(conversationHistory, currentMessage) {
+  // Teams pattern: "X vs Y" or "X contra Y"
+  const vsPattern = /([A-ZÀ-Ú][a-zà-ú]+(?:\s[A-ZÀ-Ú][a-zà-ú]+)*)\s+(?:vs?\.?|contra|v\.)\s+([A-ZÀ-Ú][a-zà-ú]+(?:\s[A-ZÀ-Ú][a-zà-ú]+)*)/i;
+
+  // Check current message first
+  const currentMatch = currentMessage.match(vsPattern);
+  if (currentMatch) {
+    return { home: currentMatch[1].trim(), away: currentMatch[2].trim(), fromHistory: false };
+  }
+
+  // Search conversation history (most recent first)
+  if (Array.isArray(conversationHistory)) {
+    for (const msg of conversationHistory) {
+      const text = (msg.user_message || '') + ' ' + (msg.zak_response || '');
+      const histMatch = text.match(vsPattern);
+      if (histMatch) {
+        return { home: histMatch[1].trim(), away: histMatch[2].trim(), fromHistory: true };
+      }
+    }
+  }
+
+  return null;
+}
+
+/**
+ * ========================================================================
+ * MARKET-SPECIFIC PARLAY GENERATOR
+ * ========================================================================
+ * Genera 5 parlays basados en el MERCADO específico detectado.
+ * NUNCA mezcla mercados que no corresponden a la pregunta.
+ */
+function generateMarketSpecificParlays(detectedMarket, ferxxxaData, bankroll = 50000) {
+  const br = bankroll || 50000;
+
+  // Market templates by type
+  const marketTemplates = {
+    cards: [
+      { profile: 'conservative', events: [{ market: 'Tarjetas Totales', prediction: 'Menos de 5.5', probability: 0.58, odds: 1.65 }] },
+      { profile: 'moderate', events: [{ market: 'Tarjetas Totales', prediction: 'Más de 3.5', probability: 0.55, odds: 1.80 }, { market: 'Equipo Local', prediction: '2+ Tarjetas', probability: 0.50, odds: 1.90 }] },
+      { profile: 'aggressive', events: [{ market: 'Tarjetas Totales', prediction: 'Más de 4.5', probability: 0.42, odds: 2.20 }, { market: 'Equipo Visitante', prediction: '2+ Tarjetas', probability: 0.45, odds: 2.00 }, { market: 'Tarjeta Roja', prediction: 'Sí hay roja', probability: 0.30, odds: 3.50 }] },
+      { profile: 'very_aggressive', events: [{ market: 'Tarjetas Totales', prediction: 'Más de 5.5', probability: 0.28, odds: 3.80 }, { market: 'Jugador específico', prediction: 'Amonestado', probability: 0.40, odds: 2.50 }] },
+      { profile: 'community_pick', events: [{ market: 'Tarjetas Totales', prediction: 'Más de 4.5', probability: 0.42, odds: 2.20 }, { market: 'BTTS', prediction: 'Ambos anotan', probability: 0.50, odds: 1.95 }] }
+    ],
+    corners: [
+      { profile: 'conservative', events: [{ market: 'Córners Totales', prediction: 'Más de 8.5', probability: 0.60, odds: 1.70 }] },
+      { profile: 'moderate', events: [{ market: 'Córners Totales', prediction: 'Más de 9.5', probability: 0.48, odds: 2.00 }, { market: 'Córners Local', prediction: 'Más de 5.5', probability: 0.50, odds: 1.85 }] },
+      { profile: 'aggressive', events: [{ market: 'Córners Totales', prediction: 'Más de 10.5', probability: 0.38, odds: 2.50 }, { market: 'Córners Visitante', prediction: 'Más de 4.5', probability: 0.48, odds: 1.90 }, { market: 'Primer Córner', prediction: 'Local', probability: 0.55, odds: 1.80 }] },
+      { profile: 'very_aggressive', events: [{ market: 'Córners Totales', prediction: 'Más de 12.5', probability: 0.22, odds: 4.50 }, { market: 'Córners 1er Tiempo', prediction: 'Más de 5.5', probability: 0.35, odds: 2.80 }] },
+      { profile: 'community_pick', events: [{ market: 'Córners Totales', prediction: 'Más de 9.5', probability: 0.48, odds: 2.00 }] }
+    ],
+    total_goals: [
+      { profile: 'conservative', events: [{ market: 'Total Goles', prediction: 'Más de 1.5', probability: 0.80, odds: 1.20 }] },
+      { profile: 'moderate', events: [{ market: 'Total Goles', prediction: 'Más de 2.5', probability: 0.55, odds: 1.75 }] },
+      { profile: 'aggressive', events: [{ market: 'Total Goles', prediction: 'Más de 3.5', probability: 0.38, odds: 2.60 }, { market: 'BTTS', prediction: 'Ambos anotan', probability: 0.50, odds: 1.90 }] },
+      { profile: 'very_aggressive', events: [{ market: 'Total Goles', prediction: 'Más de 4.5', probability: 0.22, odds: 4.80 }, { market: 'BTTS', prediction: 'Ambos anotan', probability: 0.50, odds: 1.90 }] },
+      { profile: 'community_pick', events: [{ market: 'Total Goles', prediction: 'Más de 2.5', probability: 0.55, odds: 1.75 }, { market: 'BTTS', prediction: 'Ambos anotan', probability: 0.50, odds: 1.90 }] }
+    ],
+    btts: [
+      { profile: 'conservative', events: [{ market: 'BTTS', prediction: 'Ambos anotan - Sí', probability: 0.52, odds: 1.85 }] },
+      { profile: 'moderate', events: [{ market: 'BTTS', prediction: 'Ambos anotan', probability: 0.52, odds: 1.85 }, { market: 'Total Goles', prediction: 'Más de 2.5', probability: 0.55, odds: 1.75 }] },
+      { profile: 'aggressive', events: [{ market: 'BTTS', prediction: 'Ambos anotan', probability: 0.52, odds: 1.85 }, { market: 'Total Goles', prediction: 'Más de 3.5', probability: 0.38, odds: 2.60 }] },
+      { profile: 'very_aggressive', events: [{ market: 'BTTS', prediction: 'Ambos anotan', probability: 0.52, odds: 1.85 }, { market: 'Total Goles', prediction: 'Más de 3.5', probability: 0.38, odds: 2.60 }, { market: 'Córners', prediction: 'Más de 9.5', probability: 0.48, odds: 2.00 }] },
+      { profile: 'community_pick', events: [{ market: 'BTTS', prediction: 'Ambos anotan', probability: 0.52, odds: 1.85 }] }
+    ],
+    player_goals: [
+      { profile: 'conservative', events: [{ market: 'Jugador - Gol', prediction: 'Anota en el partido', probability: 0.45, odds: 1.95 }] },
+      { profile: 'moderate', events: [{ market: 'Jugador - Gol', prediction: 'Anota en el partido', probability: 0.45, odds: 1.95 }, { market: 'Total Goles', prediction: 'Más de 2.5', probability: 0.55, odds: 1.75 }] },
+      { profile: 'aggressive', events: [{ market: 'Jugador - Primer Gol', prediction: 'Primer goleador', probability: 0.18, odds: 5.50 }] },
+      { profile: 'very_aggressive', events: [{ market: 'Jugador - Doblete', prediction: '2+ goles', probability: 0.12, odds: 8.00 }] },
+      { profile: 'community_pick', events: [{ market: 'Jugador - Gol o Asistencia', prediction: 'Participa en un gol', probability: 0.55, odds: 1.70 }] }
+    ],
+    asian_handicap: [
+      { profile: 'conservative', events: [{ market: 'Hándicap Asiático', prediction: 'Local -0.5', probability: 0.55, odds: 1.90 }] },
+      { profile: 'moderate', events: [{ market: 'Hándicap Asiático', prediction: 'Local -1', probability: 0.42, odds: 2.30 }] },
+      { profile: 'aggressive', events: [{ market: 'Hándicap Asiático', prediction: 'Local -1.5', probability: 0.30, odds: 3.20 }] },
+      { profile: 'very_aggressive', events: [{ market: 'Hándicap Asiático', prediction: 'Local -2', probability: 0.20, odds: 5.00 }] },
+      { profile: 'community_pick', events: [{ market: 'Hándicap Asiático', prediction: 'Local -0.5', probability: 0.55, odds: 1.90 }] }
+    ],
+    exact_score: [
+      { profile: 'conservative', events: [{ market: 'Marcador Exacto', prediction: '1-0', probability: 0.14, odds: 7.00 }] },
+      { profile: 'moderate', events: [{ market: 'Marcador Exacto', prediction: '2-1', probability: 0.10, odds: 9.50 }] },
+      { profile: 'aggressive', events: [{ market: 'Marcador Exacto', prediction: '2-0', probability: 0.10, odds: 8.50 }] },
+      { profile: 'very_aggressive', events: [{ market: 'Marcador Exacto', prediction: '3-1', probability: 0.06, odds: 16.00 }] },
+      { profile: 'community_pick', events: [{ market: 'Marcador Exacto', prediction: '1-1', probability: 0.10, odds: 8.00 }] }
+    ],
+    '1x2': [
+      { profile: 'conservative', events: [{ market: '1x2', prediction: 'Victoria Local', probability: 0.55, odds: 1.80 }] },
+      { profile: 'moderate', events: [{ market: '1x2', prediction: 'Victoria Local', probability: 0.55, odds: 1.80 }, { market: 'Total Goles', prediction: 'Más de 1.5', probability: 0.80, odds: 1.20 }] },
+      { profile: 'aggressive', events: [{ market: '1x2', prediction: 'Victoria Local', probability: 0.55, odds: 1.80 }, { market: 'BTTS', prediction: 'Ambos anotan', probability: 0.50, odds: 1.90 }, { market: 'Total Goles', prediction: 'Más de 2.5', probability: 0.55, odds: 1.75 }] },
+      { profile: 'very_aggressive', events: [{ market: '1x2', prediction: 'Victoria Local', probability: 0.55, odds: 1.80 }, { market: 'Total Goles', prediction: 'Más de 3.5', probability: 0.38, odds: 2.60 }, { market: 'BTTS', prediction: 'Ambos anotan', probability: 0.50, odds: 1.90 }] },
+      { profile: 'community_pick', events: [{ market: '1x2', prediction: 'Victoria Local', probability: 0.55, odds: 1.80 }, { market: 'Total Goles', prediction: 'Más de 2.5', probability: 0.55, odds: 1.75 }] }
+    ]
+  };
+
+  const kellyTargets = { conservative: 4.2, moderate: 7.0, aggressive: 9.0, very_aggressive: 11.0, community_pick: 8.0 };
+
+  // If Fercha data available, override theoretical odds with real DoradoBet odds
+  function applyFerchaOdds(events, ferData) {
+    if (!ferData?.markets) return events;
+    const m = ferData.markets;
+    return events.map(evt => {
+      const pred = evt.prediction.toLowerCase();
+      if (pred.includes('tarjeta') && pred.includes('mas de 4.5') && m.yellow_cards?.over_4_5) {
+        return { ...evt, odds: m.yellow_cards.over_4_5, source: 'doradobet_real' };
+      }
+      if (pred.includes('corner') && pred.includes('mas de 9.5') && m.corners?.total_over_9_5) {
+        return { ...evt, odds: m.corners.total_over_9_5, source: 'doradobet_real' };
+      }
+      if (pred.includes('mas de 2.5') && m.total_goals?.over_2_5) {
+        return { ...evt, odds: m.total_goals.over_2_5, source: 'doradobet_real' };
+      }
+      if (pred.includes('ambos') && m.btts?.yes) {
+        return { ...evt, odds: m.btts.yes, source: 'doradobet_real' };
+      }
+      return { ...evt, source: ferData.fallback ? 'theoretical' : 'doradobet_real' };
+    });
+  }
+
+  const template = marketTemplates[detectedMarket.market] || marketTemplates['1x2'];
+
+  return template.map((t, idx) => {
+    const kellyPct = kellyTargets[t.profile] || 5.0;
+    const events = applyFerchaOdds(t.events, ferxxxaData);
+    const combinedOdds = events.reduce((acc, e) => acc * e.odds, 1);
+    const combinedProb = events.reduce((acc, e) => acc * e.probability, 1);
+    const stake = Math.round(br * (kellyPct / 100));
+    const expectedWin = Math.round(stake * (combinedOdds - 1));
+    const ror = Math.round(Math.exp(-2 * kellyPct / 100) * 10000) / 100;
+
+    return {
+      rank: idx + 1,
+      name: `${t.profile === 'conservative' ? 'Conservadora' : t.profile === 'moderate' ? 'Moderada' : t.profile === 'aggressive' ? 'Agresiva' : t.profile === 'very_aggressive' ? 'Muy Agresiva' : 'Consenso'} - ${events[0].prediction}`,
+      risk_profile: t.profile,
+      kelly_percentage: kellyPct,
+      bankroll_amount_colones: stake,
+      expected_win_colones: expectedWin,
+      risk_of_ruin_percent: ror,
+      combined_odds: Math.round(combinedOdds * 100) / 100,
+      combined_probability: Math.round(combinedProb * 10000) / 10000,
+      events: events.map(e => ({ market: e.market, prediction: e.prediction, odds: e.odds, probability: e.probability, source: e.source || 'theoretical' })),
+      market_type: detectedMarket.market,
+      detailed_reasoning: `Basado en mercado de ${detectedMarket.label}. ${ferxxxaData && !ferxxxaData.fallback ? '[DoradoBet: cuotas reales]' : '[Teórico: sin cuotas DoradoBet en vivo]'}`,
+      max_loss_colones: stake
+    };
+  });
 }
 
 /**
@@ -442,66 +725,71 @@ async function executeGroqTool(toolName, toolInput) {
  * ENHANCED v5.0: 5-Parlay generation with varying risk profiles
  */
 const SYSTEM_PROMPTS = {
-  es: `Eres IA-Zak v8.0 - Especialista en Apuestas Deportivas (MODO QUIRÚRGICO).
+  es: `Eres IA-Zak v9.0 - Especialista en Apuestas Deportivas. MODO QUIRÚRGICO ACTIVADO.
 
-RESPONDE EXACTAMENTE LO QUE PREGUNTAN. Sin rodeos.
+REGLA ABSOLUTA DE RESPUESTA:
+Analiza la pregunta del usuario. El sistema ya detectó el mercado exacto y te lo pasa en el contexto.
+NUNCA sugieras mercados que no son el foco de la pregunta.
 
-SI PREGUNTAN POR UN JUGADOR:
-- Stats 2024-25: goles, asistencias, tiros, tarjetas
-- Calcula probabilidades: "Anota 1+" | "Asiste 1+" | "Ambos"
-- Devuelve 3 opciones: Conservadora (Kelly 3-5%), Moderada (6-8%), Agresiva (9-12%)
-- Para cada una: mercado, predicción, probabilidad, cuota, ₡ a apostar, ganancia
+MERCADOS VÁLIDOS POR TIPO DE PREGUNTA:
+• Tarjetas/Amarillas/Rojas     → SOLO markets de cards: "Tarjetas Totales", "Amonestados"
+• Córners/Esquinas             → SOLO markets de corners: "Córners Totales", "Córners 1er Tiempo"
+• Goles de jugador específico  → SOLO "Anota 1+", "Primer Goleador", "Doblete"
+• Over/Under goles del partido → SOLO "Total Goles", jamás 1x2 ni cards
+• BTTS/Ambos anotan            → SOLO "BTTS Sí" y combinaciones con Over
+• Hándicap                     → SOLO "Hándicap Asiático -0.5/-1/-1.5"
+• Resultado/1x2                → SOLO "Victoria Local/Visitante/Empate"
+• General/sin mercado          → 5 parlays multi-mercado (lo habitual)
 
-SI PREGUNTAN POR UN PARTIDO:
-- Favorito según análisis
-- 5 parlays: Conservadora | Moderada | Agresiva | Muy Agresiva | Consenso
-- Para cada parlay: eventos, probabilidad, odds, ₡, ganancia, kelly%, ror%
-
-SI PREGUNTAN POR UN MERCADO:
-- ¿Hay valor? (edge > 0?)
-- Apuesta recomendada con monto exacto
-- Fuente: [DoradoBet: X] o [FerXxxa: X]
+FLUJO OBLIGATORIO:
+1. Identifica el partido: usa {MATCH_CONTEXT} si está disponible
+2. Identifica el mercado exacto: usa {MARKET_INTENT}
+3. Consulta Fercha: usa las cuotas en {FERXXXA_MARKETS} para ese mercado
+4. Si NO hay cuotas DoradoBet: di "Sin cuotas DoradoBet en vivo para este mercado. ¿Uso datos históricos?"
+5. Genera exactamente 3 parlays del mercado solicitado: Conservadora, Moderada, Agresiva
+6. Cada parlay: monto ₡ exacto, cuota real de DoradoBet si existe, probabilidad, ganancia
 
 DATOS DISPONIBLES:
-- FerXxxa Markets: {FERXXXA_MARKETS}
+- FerXxxa/DoradoBet Markets: {FERXXXA_MARKETS}
 - FerXxxa Community: {FERXXXA_COMMUNITY}
-- Bankroll: {USER_CONTEXT}
+- Contexto de usuario: {USER_CONTEXT}
 
-KELLY CRITERION:
-- kelly_% = (edge × probability) / odds
-- Si kelly > 25%: usa Fractional Kelly (50% o 25%)
-- Si sin datos FerXxxa: usa análisis teórico con disclaimer
+KELLY: kelly_% = edge / (odds - 1). Si kelly > 25%: usa 50% Fractional Kelly.
 
-REGLA DE CORRELACIÓN:
+CORRECCIÓN DE CORRELACIÓN:
 - Home Win + Over 2.5 = +corr → ×1.08
 - Home Win + Under 2.5 = -corr → ×0.88
 - BTTS + Over 2.5 = muy corr → ×1.12
 
-JSON REQUERIDO:
+JSON REQUERIDO (siempre este formato):
 {
-  "response": "Texto breve y directo",
-  "reasoning_chain": ["Paso 1", "Paso 2", ...],
+  "response": "Texto CORTO y directo respondiendo exactamente lo preguntado",
+  "reasoning_chain": ["1. Mercado detectado: X", "2. Cuotas DoradoBet: ...", "3. Probabilidad calculada: ...", "4. Kelly = X%"],
   "confidence": "high|medium|low",
+  "data_source": "doradobet_real|theoretical|mixed",
   "recommended_parlays": [
     {
-      "name": "Conservadora - Descripción",
+      "name": "Conservadora - [Mercado específico]",
       "risk_profile": "conservative",
+      "market_type": "[cards|corners|goals|btts|1x2|etc]",
       "kelly_percentage": 4.2,
       "bankroll_amount_colones": 2100,
       "expected_win_colones": 5586,
       "combined_odds": 3.41,
-      "events": [{"market": "1x2", "prediction": "home_win", "odds": 1.75}],
-      "detailed_reasoning": "Por qué esta apuesta"
+      "events": [
+        {"market": "[EXACTAMENTE el mercado preguntado]", "prediction": "...", "odds": 1.75, "source": "doradobet_real"}
+      ],
+      "detailed_reasoning": "Por qué esta apuesta específica para ESTE mercado"
     }
   ],
-  "warnings": ["Si Kelly > 25%", "Si falta FerXxxa"]
+  "warnings": [],
+  "no_data_alert": null
 }
 
 REGLAS:
-- Cita [FUENTE: dato]
-- Si no hay datos: "Sin datos de X"
-- Risk of Ruin: usar fórmula correcta
-- Máximo ₡50,000 por apuesta`,
+- Si sin datos DoradoBet: no inventes cuotas, usa "source": "theoretical" y avisa
+- Máximo ₡50,000 por apuesta
+- Cita [DoradoBet: X.XX] cuando tengas cuota real`,
 
   en: `You are IA-Zak v8.0 - Sports Betting Specialist (SURGICAL MODE).
 
@@ -692,6 +980,26 @@ export default async function handler(req, res) {
     }
 
     // =====================================================
+    // 2.0.0 DETECT MARKET INTENT + MATCH CONTEXT (NLP Quirúrgico)
+    // =====================================================
+    const detectedMarket = detectMarketInMessage(sanitizedMessage);
+    const matchContext = extractMatchContext(conversationHistory, sanitizedMessage);
+
+    console.log(`[chat] 🎯 Market detected: ${detectedMarket.market} (${detectedMarket.label})`);
+    console.log(`[chat] ⚽ Match context: ${matchContext ? `${matchContext.home} vs ${matchContext.away}${matchContext.fromHistory ? ' (from history)' : ''}` : 'none'}`);
+
+    // Inject match context into userContext
+    if (matchContext) {
+      userContext += `\n- Partido activo: ${matchContext.home} vs ${matchContext.away}${matchContext.fromHistory ? ' (del historial de conversación)' : ''}`;
+    }
+
+    // Inject market intent into userContext
+    userContext += `\n- Mercado detectado en la pregunta: ${detectedMarket.label} (${detectedMarket.market})`;
+    if (detectedMarket.mustAvoid.length > 0) {
+      userContext += `\n- PROHIBIDO sugerir: ${detectedMarket.mustAvoid.join(', ')} (el usuario NO preguntó por eso)`;
+    }
+
+    // =====================================================
     // 2.0.1 DETECT SUBJECT: jugador, equipo de club, o selección
     // =====================================================
     let playerAnalyzed = null;
@@ -751,9 +1059,12 @@ export default async function handler(req, res) {
     };
 
     try {
-      // Extract match_id from user message (heuristic: look for team names or date patterns)
-      // In production, user would provide match_id or UI would extract it
+      // Use match context (from current message or history) to identify the fixture
       const messageMatchId = sanitizedMessage.match(/\d{4}_\d{2}_\d{2}/)?.[0] || null;
+      // Build a match key from context for DB lookup
+      const contextMatchKey = matchContext
+        ? `${matchContext.home.toLowerCase().replace(/\s+/g, '_')}_vs_${matchContext.away.toLowerCase().replace(/\s+/g, '_')}`
+        : null;
 
       let intel = null;
       if (messageMatchId) {
@@ -769,9 +1080,15 @@ export default async function handler(req, res) {
           LIMIT 2
         `;
 
+        // Try to find data for the specific match context if available
         if (recentRes && recentRes.length > 0) {
-          const marketRes = recentRes.find(r => r.topic === 'ferxxxa_markets');
-          const communityRes = recentRes.find(r => r.topic === 'ferxxxa_community');
+          // Prefer match-specific data if context is known
+          let marketRes = contextMatchKey
+            ? recentRes.find(r => r.topic === 'ferxxxa_markets' && r.match_id?.includes(contextMatchKey))
+            : null;
+          marketRes = marketRes || recentRes.find(r => r.topic === 'ferxxxa_markets');
+
+          let communityRes = recentRes.find(r => r.topic === 'ferxxxa_community');
 
           intel = {
             markets: marketRes?.summary_json || null,
@@ -864,10 +1181,45 @@ FERXXXA DORADOBET INTELLIGENCE: Temporarily unavailable (${e.message})
     }
 
     // Build final system prompt with all placeholders
+    const marketIntentStr = JSON.stringify({
+      market: detectedMarket.market,
+      label: detectedMarket.label,
+      mustAvoid: detectedMarket.mustAvoid,
+      threshold: detectedMarket.threshold
+    });
+    const matchContextStr = matchContext
+      ? `${matchContext.home} vs ${matchContext.away}${matchContext.fromHistory ? ' (del historial)' : ''}`
+      : 'No especificado (pedir al usuario)';
+
+    // Filter FerXxxa markets to only include the detected market (reduce prompt size)
+    let relevantMarkets = ferxxxaMarkets;
+    if (ferxxxaMarkets?.markets && detectedMarket.market !== 'general') {
+      const marketKeyMap = {
+        cards: ['yellow_cards', 'red_cards'],
+        corners: ['corners'],
+        total_goals: ['total_goals'],
+        btts: ['btts'],
+        '1x2': ['result_1x2'],
+        exact_score: ['exact_score'],
+        asian_handicap: ['asian_handicap'],
+        player_goals: ['player_goals'],
+        player_cards: ['yellow_cards']
+      };
+      const relevantKeys = marketKeyMap[detectedMarket.market] || Object.keys(ferxxxaMarkets.markets);
+      relevantMarkets = {
+        ...ferxxxaMarkets,
+        markets: Object.fromEntries(
+          Object.entries(ferxxxaMarkets.markets).filter(([k]) => relevantKeys.includes(k))
+        )
+      };
+    }
+
     let systemPrompt = (SYSTEM_PROMPTS[language] || SYSTEM_PROMPTS.es)
       .replace('{USER_CONTEXT}', userContext)
-      .replace('{FERXXXA_MARKETS}', ferxxxaMarkets ? JSON.stringify(ferxxxaMarkets, null, 2) : 'No market data available')
-      .replace('{FERXXXA_COMMUNITY}', ferxxxaCommunity ? JSON.stringify(ferxxxaCommunity, null, 2) : 'No community data available');
+      .replace('{MARKET_INTENT}', marketIntentStr)
+      .replace('{MATCH_CONTEXT}', matchContextStr)
+      .replace('{FERXXXA_MARKETS}', relevantMarkets ? JSON.stringify(relevantMarkets, null, 2) : 'Sin cuotas DoradoBet disponibles')
+      .replace('{FERXXXA_COMMUNITY}', ferxxxaCommunity ? JSON.stringify(ferxxxaCommunity, null, 2) : 'Sin datos de comunidad');
 
     // =====================================================
     // 3. Call Groq API with JSON mode
@@ -1042,23 +1394,33 @@ FERXXXA DORADOBET INTELLIGENCE: Temporarily unavailable (${e.message})
       console.log(`[chat] ✅ Generated ${generatedParlays.length} player-specific betting suggestions`);
     }
 
-    // If no player suggestions, generate generic parlays
+    // If no player suggestions, generate market-specific parlays
     if (!generatedParlays || generatedParlays.length === 0) {
-      const parlayProfiles = ['conservative', 'moderate', 'aggressive', 'very_aggressive', 'community_pick'];
-
-      generatedParlays = parlayProfiles.map((profile, index) => {
-        return generateParlay(
-          index + 1,
-          profile,
-          bankroll || 50000, // Default to 50k colones if not provided
-          ferxxxaMarkets,
-          ferxxxaCommunity
+      if (detectedMarket.market !== 'general') {
+        // MARKET-SPECIFIC: generate parlays targeted to the exact market asked
+        generatedParlays = generateMarketSpecificParlays(detectedMarket, ferxxxaMarkets, bankroll || 50000);
+        console.log(`[chat] 🎯 Generated ${generatedParlays.length} ${detectedMarket.market}-specific parlays`);
+      } else {
+        // GENERAL: generic multi-market parlays
+        const parlayProfiles = ['conservative', 'moderate', 'aggressive', 'very_aggressive', 'community_pick'];
+        generatedParlays = parlayProfiles.map((profile, index) =>
+          generateParlay(index + 1, profile, bankroll || 50000, ferxxxaMarkets, ferxxxaCommunity)
         );
-      });
-
-      console.log(`[chat] Generated ${generatedParlays.length} parlays (Groq output did not include them)`);
+        console.log(`[chat] Generated ${generatedParlays.length} generic parlays`);
+      }
     } else if (!usePlayerSuggestions) {
-      console.log(`[chat] Using ${generatedParlays.length} parlays from Groq output`);
+      // Groq returned parlays — validate they match the requested market
+      const hasWrongMarket = detectedMarket.market !== 'general' &&
+        generatedParlays.some(p => p.events?.some(e =>
+          detectedMarket.mustAvoid.some(avoid => e.market?.toLowerCase().includes(avoid))
+        ));
+
+      if (hasWrongMarket) {
+        console.warn(`[chat] ⚠️ Groq returned wrong-market parlays for ${detectedMarket.market}. Overriding.`);
+        generatedParlays = generateMarketSpecificParlays(detectedMarket, ferxxxaMarkets, bankroll || 50000);
+      } else {
+        console.log(`[chat] Using ${generatedParlays.length} parlays from Groq output`);
+      }
     }
 
     // =====================================================

@@ -17,6 +17,7 @@
  */
 
 import { getMatchMarkets } from './oddspapi-client.js';
+import { getDoradoBetMarkets } from './doradobet-client.js';
 import { getDb } from './_db.js';
 
 /**
@@ -30,33 +31,66 @@ function validateFixtureId(fixtureId) {
 }
 
 /**
- * Main function: Fetch real market data from OddsPapi
+ * Main function: Fetch real market data
+ * Estrategia de prioridad:
+ *   1. DoradoBet directo (fuente primaria, donde el usuario apuesta)
+ *   2. OddsPapi (backup, 350+ bookmakers incluyendo LatAm)
+ *   3. Fallback teórico (solo si ambos fallan)
  */
 async function fetchRealMarkets(fixtureId, matchInfo = {}) {
-  try {
-    console.log(`[FerXxxa] Fetching real markets for fixture ${fixtureId} from OddsPapi...`);
+  const home = matchInfo.home_team || matchInfo.homeTeam || '';
+  const away = matchInfo.away_team || matchInfo.awayTeam || '';
 
-    // Call OddsPapi client to get real odds from 350+ bookmakers
+  // ── 1. INTENTO: DoradoBet directo ──
+  if (home && away) {
+    try {
+      console.log(`[FerXxxa] 🎯 Intentando DoradoBet directo para: ${home} vs ${away}`);
+      const doradoData = await getDoradoBetMarkets(home, away);
+
+      if (doradoData && doradoData.markets && Object.keys(doradoData.markets).length > 0) {
+        console.log(`[FerXxxa] ✅ DoradoBet: ${doradoData.markets_found} mercados obtenidos`);
+        return {
+          extraction_timestamp: new Date().toISOString(),
+          fixture_id: fixtureId,
+          home_team: home,
+          away_team: away,
+          ...doradoData,
+          data_source: 'DoradoBet (directo - fuente primaria)',
+          fallback: false,
+          source_priority: 'doradobet'
+        };
+      }
+      console.warn('[FerXxxa] DoradoBet no retornó datos — intentando OddsPapi...');
+    } catch (err) {
+      console.warn('[FerXxxa] DoradoBet error:', err.message, '— intentando OddsPapi...');
+    }
+  }
+
+  // ── 2. INTENTO: OddsPapi (backup) ──
+  try {
+    console.log(`[FerXxxa] 📡 Intentando OddsPapi para fixture ${fixtureId}...`);
     const marketsData = await getMatchMarkets(fixtureId, matchInfo);
 
-    if (!marketsData) {
-      console.warn(`[FerXxxa] OddsPapi returned no data. Returning fallback.`);
-      return generateFallbackData(fixtureId, matchInfo);
+    if (marketsData) {
+      console.log('[FerXxxa] ✅ OddsPapi: datos obtenidos');
+      return {
+        extraction_timestamp: new Date().toISOString(),
+        fixture_id: fixtureId,
+        home_team: home || 'Home',
+        away_team: away || 'Away',
+        ...marketsData,
+        data_source: 'OddsPapi (350+ bookmakers)',
+        fallback: false,
+        source_priority: 'oddspapi'
+      };
     }
-
-    return {
-      extraction_timestamp: new Date().toISOString(),
-      fixture_id: fixtureId,
-      home_team: matchInfo.home_team || 'Home',
-      away_team: matchInfo.away_team || 'Away',
-      ...marketsData,
-      data_source: 'OddsPapi (350+ bookmakers, real-time)',
-      fallback: false
-    };
-  } catch (error) {
-    console.error('[FerXxxa] Error fetching real markets:', error.message);
-    return generateFallbackData(fixtureId, matchInfo);
+  } catch (oddsError) {
+    console.warn('[FerXxxa] OddsPapi error:', oddsError.message);
   }
+
+  // ── 3. FALLBACK teórico ──
+  console.warn('[FerXxxa] Ambas fuentes fallaron — usando datos teóricos');
+  return generateFallbackData(fixtureId, matchInfo);
 }
 
 /**
