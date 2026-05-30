@@ -3,15 +3,15 @@
   "crons": [
     {
       "path": "/api/ferxxxa-markets",
-      "schedule": "*/5 * * * *"
-    },
-    {
-      "path": "/api/learn",
       "schedule": "0 7 * * *"
     },
     {
+      "path": "/api/learn",
+      "schedule": "0 8 * * *"
+    },
+    {
       "path": "/api/ferxxxa-community",
-      "schedule": "*/5 * * * *"
+      "schedule": "0 9 * * *"
     }
   ]
 }
