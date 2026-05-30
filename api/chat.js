@@ -34,21 +34,16 @@ const sendSuccess = (res, data = {}, message = '') => {
   res.status(200).json({ success: true, message, ...data });
 };
 
-// Initialize Groq with API key validation
-// API key must be set via GROQ_API_KEY environment variable in Vercel
-const groqApiKey = process.env.GROQ_API_KEY;
-
-console.log('[chat] Groq initialization:', {
-  hasApiKey: !!groqApiKey,
-  keyLength: groqApiKey ? groqApiKey.length : 0,
-  keyStart: groqApiKey ? groqApiKey.substring(0, 10) : 'MISSING',
-  source: process.env.GROQ_API_KEY ? 'environment' : 'hardcoded-fallback',
-  timestamp: new Date().toISOString()
-});
-
-const groq = new Groq({
-  apiKey: groqApiKey
-});
+// Groq is initialized lazily inside the handler to avoid module-load crash when key is missing
+let _groq = null;
+function getGroq() {
+  if (!_groq) {
+    const key = process.env.GROQ_API_KEY;
+    if (!key) return null;
+    _groq = new Groq({ apiKey: key });
+  }
+  return _groq;
+}
 
 /**
  * ========================================================================
@@ -877,6 +872,8 @@ FERXXXA DORADOBET INTELLIGENCE: Temporarily unavailable (${e.message})
     // =====================================================
     let groqResponse;
     try {
+      const groq = getGroq();
+      if (!groq) throw new Error('GROQ_API_KEY not configured');
       groqResponse = await groq.chat.completions.create({
         model: 'llama-3.3-70b-versatile', // Latest active Groq model (Llama 3.3)
         messages: [
