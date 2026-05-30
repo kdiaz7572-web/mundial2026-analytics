@@ -1065,14 +1065,34 @@ FERXXXA DORADOBET INTELLIGENCE: Temporarily unavailable (${e.message})
 
     // =====================================================
     // 5.0.1 ENRICH PARLAYS: Calculate missing fields server-side
-    // Groq sometimes omits expected_win_colones, risk_of_ruin_percent, rank
-    // We recalculate them here with correct math to ensure UI always has data
+    // Groq often returns kelly_percentage=0, expected_win=0, ror=0
+    // We always override with correct server-side calculations
     // =====================================================
     const effectiveBankroll = bankroll || 50000;
+
+    // Kelly targets per profile when Groq returns 0
+    const kellyTargets = {
+      conservative: 4.2,
+      moderate: 7.0,
+      aggressive: 9.0,
+      very_aggressive: 11.0,
+      community_pick: 8.0
+    };
+
     generatedParlays = generatedParlays.map((parlay, idx) => {
-      const kellyPct = parlay.kelly_percentage || 0;
+      const profile = parlay.risk_profile || 'conservative';
+
+      // Use Kelly from Groq if > 0, else use profile target
+      const kellyPct = (parlay.kelly_percentage > 0)
+        ? parlay.kelly_percentage
+        : kellyTargets[profile] || 5.0;
+
       const combinedOdds = parlay.combined_odds || 1;
-      const stake = parlay.bankroll_amount_colones || Math.round(effectiveBankroll * (kellyPct / 100));
+
+      // Stake: use Groq value if > 0, else calculate from Kelly
+      const stake = (parlay.bankroll_amount_colones > 0)
+        ? parlay.bankroll_amount_colones
+        : Math.round(effectiveBankroll * (kellyPct / 100));
 
       // expected_win = stake × (odds - 1)
       const expectedWin = (combinedOdds > 1 && stake > 0)
@@ -1081,9 +1101,7 @@ FERXXXA DORADOBET INTELLIGENCE: Temporarily unavailable (${e.message})
 
       // Risk of Ruin: RoR ≈ e^(-2 × kelly_fraction)
       const kellyFraction = kellyPct / 100;
-      const ror = (kellyFraction > 0 && kellyFraction < 0.5)
-        ? Math.round(Math.exp(-2 * kellyFraction) * 10000) / 100
-        : 0;
+      const ror = Math.round(Math.exp(-2 * kellyFraction) * 10000) / 100;
 
       // combined_probability from events if missing
       let combinedProb = parlay.combined_probability;
@@ -1092,16 +1110,14 @@ FERXXXA DORADOBET INTELLIGENCE: Temporarily unavailable (${e.message})
         combinedProb = Math.round(combinedProb * 10000) / 10000;
       }
 
-      // Always use server calculation if Groq returns 0 or missing
-      const finalRoR = (parlay.risk_of_ruin_percent > 0) ? parlay.risk_of_ruin_percent : ror;
-      const finalWin = (parlay.expected_win_colones > 0) ? parlay.expected_win_colones : expectedWin;
-
       return {
         rank: parlay.rank || (idx + 1),
         ...parlay,
+        // Always override with server-calculated values
+        kelly_percentage: kellyPct,
         bankroll_amount_colones: stake,
-        expected_win_colones: finalWin,
-        risk_of_ruin_percent: finalRoR,
+        expected_win_colones: expectedWin,
+        risk_of_ruin_percent: ror,
         combined_probability: combinedProb,
         max_loss_colones: stake
       };
