@@ -241,9 +241,11 @@ function generateParlay(rank, profile, bankroll, markets, communityData) {
   combinedProb *= correlationFactors[profile];
   combinedProb = Math.min(0.95, Math.max(0.01, combinedProb)); // Cap between 1-95%
 
-  const kellyCalc = calculateKelly(combinedProb, combinedOdds);
+  // Use Kelly from formula, but fall back to profile target if edge is negative (data is theoretical)
+  const kellyCalcRaw = calculateKelly(combinedProb, combinedOdds);
+  const kellyCalc = kellyCalcRaw > 0 ? kellyCalcRaw : kellyPct;
   const riskOfRuin = calcRoR(kellyCalc);
-  const expectedWin = bankrollAmount * (combinedOdds - 1);
+  const expectedWin = Math.round(bankrollAmount * (combinedOdds - 1));
 
   // Build visual breakdown (DoradoBet style)
   const breakdown = [
