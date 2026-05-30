@@ -139,12 +139,10 @@ function calculateKelly(probability, odds) {
  * P(ruin) for parlay = (1 - kelly_edge)^(num_bets)
  * For single parlay: RoR ≈ (1 / odds)^sequence_losses
  */
-function calculateRiskOfRuin(kellyPercentage, bankroll) {
+function calcRoR(kellyPercentage) {
   if (kellyPercentage <= 0 || kellyPercentage >= 0.5) return 0;
 
-  // Risk of Ruin approximation for parlay betting
-  // RoR ≈ e^(-2 × kelly_%)
-  // This represents the probability of losing the entire bankroll
+  // Risk of Ruin approximation: RoR ≈ e^(-2 × kelly_%)
   const ror = Math.exp(-2 * kellyPercentage);
 
   return Math.min(100, Math.round(ror * 10000) / 100); // Cap at 100%, round to 2 decimals
@@ -248,7 +246,7 @@ function generateParlay(rank, profile, bankroll, markets, communityData) {
   combinedProb = Math.min(0.95, Math.max(0.01, combinedProb)); // Cap between 1-95%
 
   const kellyCalc = calculateKelly(combinedProb, combinedOdds);
-  const riskOfRuin = calculateRiskOfRuin(kellyCalc, bankroll);
+  const riskOfRuin = calcRoR(kellyCalc);
   const expectedWin = bankrollAmount * (combinedOdds - 1);
 
   // Build visual breakdown (DoradoBet style)
