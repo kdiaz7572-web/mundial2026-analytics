@@ -872,32 +872,44 @@ export default async function handler(req, res) {
     return sendError(res, 405, 'Method Not Allowed', 'Only POST requests are allowed');
   }
 
-  // Check critical dependencies FIRST
+  // Validate request first (needed even for fallback)
+  const { message, session_id, language = 'es', bankroll } = req.body;
+
+  // Check critical dependencies — but still run NLP if Groq is missing
   if (!process.env.GROQ_API_KEY) {
-    console.error('[chat] GROQ_API_KEY not configured - falling back');
-    // Generate fallback parlays even if Groq is not configured
-    const fallbackParlays = [
-      generateParlay(1, 'conservative', 50000, null, null),
-      generateParlay(2, 'moderate', 50000, null, null),
-      generateParlay(3, 'aggressive', 50000, null, null),
-      generateParlay(4, 'very_aggressive', 50000, null, null),
-      generateParlay(5, 'community_pick', 50000, null, null)
-    ];
+    console.error('[chat] GROQ_API_KEY not configured - using NLP fallback mode');
+
+    // Run NLP on the message even without Groq so market-specific parlays work
+    const fbMarket = message ? detectMarketInMessage(sanitizeInput(message)) : { market: 'general', label: 'General', mustAvoid: [] };
+    const fbBankroll = typeof bankroll === 'number' && bankroll >= 5000 ? bankroll : 50000;
+
+    const fallbackParlays = fbMarket.market !== 'general'
+      ? generateMarketSpecificParlays(fbMarket, null, fbBankroll)
+      : [
+          generateParlay(1, 'conservative', fbBankroll, null, null),
+          generateParlay(2, 'moderate', fbBankroll, null, null),
+          generateParlay(3, 'aggressive', fbBankroll, null, null),
+          generateParlay(4, 'very_aggressive', fbBankroll, null, null),
+          generateParlay(5, 'community_pick', fbBankroll, null, null)
+        ];
+
+    const fbResponse = fbMarket.market !== 'general'
+      ? `Análisis de ${fbMarket.label} (modo offline — sin IA conectada). Las apuestas se basan en estadísticas históricas. ⚠️ Sin cuotas reales de DoradoBet en este momento.`
+      : 'IA-Zak está en modo offline. Mostrando análisis teórico basado en datos históricos.';
+
     return sendSuccess(res, {
-      response: 'IA-Zak necesita configuración. Por favor, contacta al administrador.',
-      reasoning_chain: ['Revisor de configuración', 'GROQ_API_KEY no encontrada', 'Entrando en modo fallback'],
-      recommendations: ['Configure GROQ_API_KEY en Vercel environment variables'],
+      response: fbResponse,
+      reasoning_chain: [`Mercado detectado: ${fbMarket.label}`, 'Groq offline — usando análisis local', 'Parlays generados con datos teóricos'],
+      recommendations: [],
       kelly_calculations: null,
       recommended_parlays: fallbackParlays,
-      data_sources_used: [],
-      confidence: 'unavailable',
+      data_sources_used: ['historical_data'],
+      confidence: 'low',
       tool_calls: [],
-      fallback: true
-    }, 'Configuration required');
+      fallback: true,
+      market_detected: fbMarket.market
+    }, 'NLP fallback mode');
   }
-
-  // Validate request
-  const { message, session_id, language = 'es', bankroll } = req.body;
 
   if (!message || !session_id) {
     return sendError(res, 400, 'Bad Request', 'message and session_id are required');
