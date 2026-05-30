@@ -17,6 +17,7 @@ import {
   calculateEdge
 } from '../js/kelly_calculator.js';
 import { analyzePlayer } from './player-analyzer.js';
+import { detectSubject, analyzeTeam } from './team-analyzer.js';
 import { generateSmartSuggestions, generatePlayerBettingSuggestions } from './smart-suggestions.js';
 
 // Inline simple utility functions to avoid middleware import issues
