@@ -411,7 +411,7 @@ function detectMarketInMessage(message) {
     // BTTS
     {
       market: 'btts',
-      patterns: [/ambos anotan/, /ambos marcan/, /los dos anotan/, /btts/, /both teams score/, /que ambos/],
+      patterns: [/ambos anotan/, /ambos marcan/, /los dos anotan/, /btts/, /both teams score/, /que ambos/, /ambos equipos anotan/, /ambos equipos marcan/, /los dos equipos/],
       mustAvoid: ['corners', 'cards', 'exact_score'],
       label: 'Ambos Anotan'
     },
