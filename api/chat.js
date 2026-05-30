@@ -372,7 +372,8 @@ function detectMarketInMessage(message) {
     },
     {
       market: 'player_cards',
-      patterns: [/tarjeta.*(?:para|a|de) \w/, /amonestado/, /expulsado/, /sera amarill/, /ve.?a la ducha/],
+      // Must reference a SPECIFIC person/team, not just "yellow cards in general"
+      patterns: [/tarjeta\s+(?:para|a|de)\s+\w/, /amonestado/, /expulsado/, /sera\s+amarill/, /ve.?a\s+la\s+ducha/, /que\s+\w+\s+sea\s+amone/],
       mustAvoid: ['1x2', 'corners', 'goals'],
       label: 'Tarjetas de Jugador'
     },
@@ -592,7 +593,10 @@ function generateMarketSpecificParlays(detectedMarket, ferxxxaData, bankroll = 5
     });
   }
 
-  const template = marketTemplates[detectedMarket.market] || marketTemplates['1x2'];
+  // Alias mappings: player_cards → cards, player_shots → player_goals
+  const marketAlias = { player_cards: 'cards', player_shots: 'player_goals' };
+  const resolvedMarket = marketAlias[detectedMarket.market] || detectedMarket.market;
+  const template = marketTemplates[resolvedMarket] || marketTemplates['general'] || marketTemplates['1x2'];
 
   return template.map((t, idx) => {
     const kellyPct = kellyTargets[t.profile] || 5.0;
