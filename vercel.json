@@ -1,10 +1,6 @@
 {
   "version": 2,
   "functions": {
-    "api/doradobet-scraper.js": {
-      "maxDuration": 60,
-      "memory": 1024
-    },
     "api/ferxxxa-markets.js": {
       "maxDuration": 60,
       "memory": 1024
