@@ -48,8 +48,9 @@ export async function getMatchMarkets(fixtureId, matchInfo = {}) {
   // Try each soccer sport key to find the match
   for (const sportKey of SOCCER_SPORT_KEYS) {
     try {
+      // btts not supported by all sports in The Odds API — use h2h + totals
       const oddsResp = await fetch(
-        `${THE_ODDS_API_BASE}/sports/${sportKey}/odds?apiKey=${THE_ODDS_API_KEY}&regions=eu,us&markets=h2h,totals,btts&oddsFormat=decimal`,
+        `${THE_ODDS_API_BASE}/sports/${sportKey}/odds?apiKey=${THE_ODDS_API_KEY}&regions=eu&markets=h2h,totals&oddsFormat=decimal`,
         { signal: AbortSignal.timeout(8000) }
       );
 
