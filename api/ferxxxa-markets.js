@@ -17,7 +17,7 @@
  */
 
 import { getMatchMarkets } from './oddspapi-client.js';
-import { getDoradoBetMarkets } from './doradobet-client.js';
+import { scrapeDoradoBetMatch } from './doradobet-scraper.js';
 import { getDb } from './_db.js';
 
 /**
@@ -41,28 +41,29 @@ async function fetchRealMarkets(fixtureId, matchInfo = {}) {
   const home = matchInfo.home_team || matchInfo.homeTeam || '';
   const away = matchInfo.away_team || matchInfo.awayTeam || '';
 
-  // ── 1. INTENTO: DoradoBet directo ──
+  // ── 1. INTENTO: DoradoBet via Puppeteer (browser real, bypass Cloudflare) ──
   if (home && away) {
     try {
-      console.log(`[FerXxxa] 🎯 Intentando DoradoBet directo para: ${home} vs ${away}`);
-      const doradoData = await getDoradoBetMarkets(home, away);
+      console.log(`[FerXxxa] 🌐 DoradoBet Puppeteer para: ${home} vs ${away}`);
+      const scraped = await scrapeDoradoBetMatch(home, away);
 
-      if (doradoData && doradoData.markets && Object.keys(doradoData.markets).length > 0) {
-        console.log(`[FerXxxa] ✅ DoradoBet: ${doradoData.markets_found} mercados obtenidos`);
+      if (scraped?.success && scraped.markets && Object.keys(scraped.markets).length > 0) {
+        console.log(`[FerXxxa] ✅ DoradoBet Puppeteer: ${Object.keys(scraped.markets).length} mercados`);
         return {
           extraction_timestamp: new Date().toISOString(),
           fixture_id: fixtureId,
           home_team: home,
           away_team: away,
-          ...doradoData,
-          data_source: 'DoradoBet (directo - fuente primaria)',
+          markets: scraped.markets,
+          markets_found: Object.keys(scraped.markets).length,
+          data_source: 'DoradoBet (Puppeteer - fuente primaria)',
           fallback: false,
-          source_priority: 'doradobet'
+          source_priority: 'doradobet_puppeteer'
         };
       }
-      console.warn('[FerXxxa] DoradoBet no retornó datos — intentando OddsPapi...');
+      console.warn(`[FerXxxa] DoradoBet Puppeteer sin datos (APIs: ${scraped?.rawResponses || 0}) — intentando The Odds API...`);
     } catch (err) {
-      console.warn('[FerXxxa] DoradoBet error:', err.message, '— intentando OddsPapi...');
+      console.warn('[FerXxxa] DoradoBet Puppeteer error:', err.message, '— fallback a The Odds API');
     }
   }
 
