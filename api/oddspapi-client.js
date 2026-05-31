@@ -1,254 +1,193 @@
 /**
  * ============================================================
- * OddsPapi Client - Real-time Betting Odds
+ * The Odds API Client — Cuotas Reales de 80+ Bookmakers
  * ============================================================
- * Fetches real betting odds from 350+ bookmakers (LatAm included)
- * for World Cup 2026 matches.
+ * API: https://the-odds-api.com/
+ * Free tier: 500 requests/month
+ * Bookmakers: bet365, betfair, draftkings, fanduel, unibet, +80 más
+ * Cobertura: Soccer, World Cup, Champions League, etc.
  *
- * API Docs: https://oddspapi.io/en
- * Pricing: Free tier available (sufficient for testing)
+ * Key en Vercel: ODDS_API_KEY
  */
 
-const ODDSPAPI_BASE_URL = 'https://api.oddspapi.io/api/v1';
-const ODDSPAPI_KEY = process.env.ODDSPAPI_KEY; // Must be set in Vercel
+const THE_ODDS_API_BASE = 'https://api.the-odds-api.com/v4';
+const THE_ODDS_API_KEY = process.env.ODDS_API_KEY;
+
+// Soccer sport keys in The Odds API
+const SOCCER_SPORT_KEYS = [
+  'soccer_fifa_world_cup',
+  'soccer_conmebol_copa_america',
+  'soccer_uefa_euro_qualification',
+  'soccer_france_ligue_one',
+  'soccer_spain_la_liga',
+  'soccer_epl',
+  'soccer_germany_bundesliga',
+  'soccer_italy_serie_a'
+];
 
 /**
- * Validate API key is configured
+ * Search for a match by team names across all soccer leagues.
+ * Returns the event + odds or null if not found.
  */
-function validateApiKey() {
-  if (!ODDSPAPI_KEY) {
-    throw new Error('ODDSPAPI_KEY not configured in Vercel environment');
+export async function getMatchMarkets(fixtureId, matchInfo = {}) {
+  if (!THE_ODDS_API_KEY) {
+    console.warn('[OddsAPI] ODDS_API_KEY not configured');
+    return null;
   }
-  return true;
+
+  const home = matchInfo.home_team || matchInfo.homeTeam || '';
+  const away = matchInfo.away_team || matchInfo.awayTeam || '';
+
+  if (!home || !away) {
+    console.warn('[OddsAPI] No team names provided for search');
+    return null;
+  }
+
+  console.log(`[OddsAPI] Searching for: ${home} vs ${away}`);
+
+  // Try each soccer sport key to find the match
+  for (const sportKey of SOCCER_SPORT_KEYS) {
+    try {
+      const oddsResp = await fetch(
+        `${THE_ODDS_API_BASE}/sports/${sportKey}/odds?apiKey=${THE_ODDS_API_KEY}&regions=eu,us&markets=h2h,totals,btts&oddsFormat=decimal`,
+        { signal: AbortSignal.timeout(8000) }
+      );
+
+      if (!oddsResp.ok) {
+        if (oddsResp.status === 422) continue; // sport not available right now
+        console.warn(`[OddsAPI] ${sportKey}: HTTP ${oddsResp.status}`);
+        continue;
+      }
+
+      const events = await oddsResp.json();
+      if (!Array.isArray(events)) continue;
+
+      // Find matching event
+      const homeLower = home.toLowerCase();
+      const awayLower = away.toLowerCase();
+
+      const match = events.find(evt => {
+        const h = (evt.home_team || '').toLowerCase();
+        const a = (evt.away_team || '').toLowerCase();
+        return (
+          (h.includes(homeLower.split(' ')[0]) || homeLower.includes(h.split(' ')[0])) &&
+          (a.includes(awayLower.split(' ')[0]) || awayLower.includes(a.split(' ')[0]))
+        );
+      });
+
+      if (match) {
+        console.log(`[OddsAPI] ✅ Found: ${match.home_team} vs ${match.away_team} (${sportKey})`);
+        return parseTheOddsApiEvent(match);
+      }
+    } catch (err) {
+      console.warn(`[OddsAPI] Error on ${sportKey}:`, err.message);
+    }
+  }
+
+  console.warn(`[OddsAPI] Match not found: ${home} vs ${away}`);
+  return null;
 }
 
 /**
- * Fetch upcoming matches from OddsPapi
+ * Get upcoming soccer events (for Fercha cron)
  */
-async function fetchUpcomingMatches() {
-  try {
-    validateApiKey();
+export async function getUpcomingMatches() {
+  if (!THE_ODDS_API_KEY) return null;
 
-    const response = await fetch(
-      `${ODDSPAPI_BASE_URL}/fixtures?competition_id=1&api_key=${ODDSPAPI_KEY}`,
-      {
-        method: 'GET',
-        headers: { 'Accept': 'application/json' }
-      }
+  try {
+    const resp = await fetch(
+      `${THE_ODDS_API_BASE}/sports/soccer_fifa_world_cup/odds?apiKey=${THE_ODDS_API_KEY}&regions=eu,us&markets=h2h,totals&oddsFormat=decimal`,
+      { signal: AbortSignal.timeout(8000) }
     );
 
-    if (!response.ok) {
-      console.error(`[OddsPapi] HTTP ${response.status}:`, response.statusText);
-      return null;
-    }
-
-    const data = await response.json();
-    return data.data || [];
-  } catch (error) {
-    console.error('[OddsPapi] Error fetching matches:', error.message);
+    if (!resp.ok) return null;
+    const events = await resp.json();
+    return Array.isArray(events) ? events.map(parseTheOddsApiEvent) : null;
+  } catch (err) {
+    console.warn('[OddsAPI] getUpcomingMatches error:', err.message);
     return null;
   }
 }
 
 /**
- * Fetch odds for a specific match from ALL bookmakers
- * Returns real odds from 350+ bookmakers (BET365, FanDuel, DraftKings, Betfair, etc.)
+ * Parse a The Odds API event into our standard markets format
  */
-async function fetchMatchOdds(fixtureId) {
-  try {
-    validateApiKey();
-
-    const response = await fetch(
-      `${ODDSPAPI_BASE_URL}/odds?fixture_id=${fixtureId}&api_key=${ODDSPAPI_KEY}`,
-      {
-        method: 'GET',
-        headers: { 'Accept': 'application/json' }
-      }
-    );
-
-    if (!response.ok) {
-      console.error(`[OddsPapi] HTTP ${response.status} for fixture ${fixtureId}`);
-      return null;
-    }
-
-    const data = await response.json();
-    return data.data || [];
-  } catch (error) {
-    console.error('[OddsPapi] Error fetching odds:', error.message);
-    return null;
-  }
-}
-
-/**
- * Aggregate odds from multiple bookmakers into meaningful markets
- * Maps raw OddsPapi data → 67+ markets format
- */
-function aggregateOddsToMarkets(oddsData, fixtureData) {
-  if (!oddsData || oddsData.length === 0) {
-    return null;
-  }
-
+function parseTheOddsApiEvent(event) {
   const markets = {
     result_1x2: { home: null, draw: null, away: null },
     total_goals: {},
-    btts: { yes: null, no: null },
-    yellow_cards: {},
-    corners: {},
-    exact_score: {},
-    handicap: {},
-    player_props: {}
+    btts: { yes: null, no: null }
   };
 
-  // Group odds by bookmaker
-  const bookmakerOdds = {};
-  for (const odd of oddsData) {
-    const bookmaker = odd.bookmaker_name || 'unknown';
-    if (!bookmakerOdds[bookmaker]) bookmakerOdds[bookmaker] = [];
-    bookmakerOdds[bookmaker].push(odd);
-  }
+  // Average odds across bookmakers for best estimate
+  const bookmakerCount = { h2h: 0, totals: 0 };
+  const odds = { home: [], draw: [], away: [] };
+  const totalsOdds = {};
+  const bttsOdds = { yes: [], no: [] };
 
-  // Calculate average odds from sharpest bookmakers
-  // (BET365, DraftKings, FanDuel are typically sharpest)
-  const sharps = Object.keys(bookmakerOdds).filter(bm =>
-    ['bet365', 'draftkings', 'fanduel', 'betfair'].includes(bm.toLowerCase())
-  );
-
-  const sourceBooks = sharps.length > 0 ? sharps : Object.keys(bookmakerOdds).slice(0, 5);
-
-  // Map OddsPapi market IDs to our format
-  // OddsPapi uses: 'h2h' (1x2), 'totals' (Over/Under), 'btts', etc.
-  for (const bookmaker of sourceBooks) {
-    for (const odd of bookmakerOdds[bookmaker]) {
-      const { market_id, market_name, value, outcome } = odd;
-
-      // 1x2 Result
-      if (market_id === 'h2h' || market_name?.includes('1x2') || market_name?.includes('Match Result')) {
-        if (outcome.includes('Home') || outcome === '1') {
-          if (!markets.result_1x2.home) markets.result_1x2.home = parseFloat(value);
-        } else if (outcome === 'Draw') {
-          if (!markets.result_1x2.draw) markets.result_1x2.draw = parseFloat(value);
-        } else if (outcome.includes('Away') || outcome === '2') {
-          if (!markets.result_1x2.away) markets.result_1x2.away = parseFloat(value);
+  for (const bm of (event.bookmakers || [])) {
+    for (const mkt of (bm.markets || [])) {
+      if (mkt.key === 'h2h') {
+        bookmakerCount.h2h++;
+        for (const outcome of mkt.outcomes) {
+          if (outcome.name === event.home_team) odds.home.push(outcome.price);
+          else if (outcome.name === event.away_team) odds.away.push(outcome.price);
+          else if (outcome.name === 'Draw') odds.draw.push(outcome.price);
         }
       }
 
-      // Over/Under Goals
-      if (market_id === 'totals' || market_name?.includes('Total Goals') || market_name?.includes('Over/Under')) {
-        const matchOver = market_name?.match(/Over\s+(\d+\.?\d*)/i);
-        const matchUnder = market_name?.match(/Under\s+(\d+\.?\d*)/i);
-
-        if (matchOver && outcome.includes('Over')) {
-          const threshold = matchOver[1];
-          if (!markets.total_goals[`over_${threshold}`])
-            markets.total_goals[`over_${threshold}`] = parseFloat(value);
-        }
-        if (matchUnder && outcome.includes('Under')) {
-          const threshold = matchUnder[1];
-          if (!markets.total_goals[`under_${threshold}`])
-            markets.total_goals[`under_${threshold}`] = parseFloat(value);
+      if (mkt.key === 'totals') {
+        bookmakerCount.totals++;
+        for (const outcome of mkt.outcomes) {
+          const line = outcome.point ? `${outcome.name.toLowerCase()}_${String(outcome.point).replace('.', '_')}` : null;
+          if (line) {
+            if (!totalsOdds[line]) totalsOdds[line] = [];
+            totalsOdds[line].push(outcome.price);
+          }
         }
       }
 
-      // Both Teams to Score
-      if (market_id === 'btts' || market_name?.includes('Both Teams to Score')) {
-        if (outcome === 'Yes') markets.btts.yes = parseFloat(value);
-        if (outcome === 'No') markets.btts.no = parseFloat(value);
+      if (mkt.key === 'btts') {
+        for (const outcome of mkt.outcomes) {
+          if (outcome.name === 'Yes') bttsOdds.yes.push(outcome.price);
+          else if (outcome.name === 'No') bttsOdds.no.push(outcome.price);
+        }
       }
     }
   }
 
+  // Average the odds
+  const avg = arr => arr.length > 0 ? Math.round((arr.reduce((a, b) => a + b, 0) / arr.length) * 100) / 100 : null;
+
+  markets.result_1x2 = {
+    home: avg(odds.home),
+    draw: avg(odds.draw),
+    away: avg(odds.away),
+    source: 'the_odds_api'
+  };
+
+  for (const [line, prices] of Object.entries(totalsOdds)) {
+    markets.total_goals[line] = avg(prices);
+  }
+
+  markets.btts = {
+    yes: avg(bttsOdds.yes),
+    no: avg(bttsOdds.no),
+    source: 'the_odds_api'
+  };
+
   return {
+    home_team: event.home_team,
+    away_team: event.away_team,
+    commence_time: event.commence_time,
+    sport: event.sport_key,
     markets,
-    bookmakers_used: sourceBooks.length,
-    total_bookmakers_available: Object.keys(bookmakerOdds).length,
-    extraction_timestamp: new Date().toISOString()
+    bookmakers_used: event.bookmakers?.length || 0,
+    markets_found: Object.keys(markets).filter(k => {
+      const m = markets[k];
+      return m && (typeof m === 'object' ? Object.values(m).some(v => v !== null) : true);
+    }).length,
+    source: 'the_odds_api',
+    fallback: false
   };
 }
-
-/**
- * Get market movement (comparing vs historical avg)
- * Indicates if odds are shifting significantly
- */
-function analyzeMovement(currentOdds, historicalAvg) {
-  if (!historicalAvg) return { direction: 'unknown', magnitude: 0 };
-
-  const movement = ((currentOdds - historicalAvg) / historicalAvg * 100).toFixed(2);
-  const direction = movement > 2 ? 'down' : movement < -2 ? 'up' : 'stable';
-
-  return {
-    direction,
-    magnitude: parseFloat(movement),
-    percentage: `${movement}%`
-  };
-}
-
-/**
- * Main function: Get all markets for a match from OddsPapi
- */
-async function getMatchMarkets(fixtureId, matchInfo = {}) {
-  console.log(`[OddsPapi] Fetching markets for fixture ${fixtureId}...`);
-
-  try {
-    const oddsData = await fetchMatchOdds(fixtureId);
-    if (!oddsData) {
-      console.warn(`[OddsPapi] No odds data returned for fixture ${fixtureId}`);
-      return null;
-    }
-
-    const aggregated = aggregateOddsToMarkets(oddsData, matchInfo);
-
-    return {
-      success: true,
-      fixture_id: fixtureId,
-      home_team: matchInfo.home_team || 'TBD',
-      away_team: matchInfo.away_team || 'TBD',
-      ...aggregated,
-      data_quality: {
-        markets_extracted: Object.keys(aggregated.markets).length,
-        odds_freshness_seconds: 60, // OddsPapi updates ~every minute
-        last_update: new Date().toISOString(),
-        source: 'OddsPapi (350+ bookmakers)',
-        live_match: false
-      }
-    };
-  } catch (error) {
-    console.error('[OddsPapi] Error in getMatchMarkets:', error.message);
-    return null;
-  }
-}
-
-/**
- * Get historical odds for a match (learning feature)
- * Useful for IA-Zak to understand line movement
- */
-async function getHistoricalOdds(fixtureId, daysBack = 7) {
-  try {
-    validateApiKey();
-
-    const response = await fetch(
-      `${ODDSPAPI_BASE_URL}/historical-odds?fixture_id=${fixtureId}&days=${daysBack}&api_key=${ODDSPAPI_KEY}`,
-      {
-        method: 'GET',
-        headers: { 'Accept': 'application/json' }
-      }
-    );
-
-    if (!response.ok) return null;
-
-    const data = await response.json();
-    return data.data || [];
-  } catch (error) {
-    console.error('[OddsPapi] Error fetching historical odds:', error.message);
-    return null;
-  }
-}
-
-export {
-  fetchUpcomingMatches,
-  fetchMatchOdds,
-  getMatchMarkets,
-  getHistoricalOdds,
-  analyzeMovement,
-  aggregateOddsToMarkets,
-  validateApiKey
-};
