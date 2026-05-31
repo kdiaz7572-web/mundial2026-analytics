@@ -7,7 +7,6 @@ const STATE = {
   currentTab: 'dashboard',
   confederationFilter: 'ALL',
   groupFilter: 'A',
-  bettingHistory: JSON.parse(localStorage.getItem('mundial2026_bets') || '[]'),
   modelTab: 'goles',
   modelAnalysis: null,
   modelRefType: 'default',
@@ -17,7 +16,6 @@ const TABS = [
   { id: 'dashboard',  label: '📊 Dashboard' },
   { id: 'equipos',    label: '🌍 Equipos' },
   { id: 'calendario', label: '📅 Calendario' },
-  { id: 'apuestas',   label: '💡 Apuestas' },
   { id: 'zak',        label: '🤖 IA-Zak' },
   { id: 'analytics',  label: '📈 Analytics' },
 ];
@@ -179,7 +177,6 @@ function deleteBet(id) {
 // ——— DASHBOARD ———
 function renderDashboard() {
   const probs      = calculateAllProbabilities();
-  const valueBets  = detectValueBets(probs).filter(v => v.isValue);
   const top5       = probs.slice(0, 5);
   const upcoming   = FIXTURES.filter(f => f.homeGoals === null).slice(0, 4);
   const played     = FIXTURES.filter(f => f.homeGoals !== null).length;
@@ -221,7 +218,7 @@ function renderDashboard() {
       </div>
 
       <!-- Stat cards -->
-      <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
         <div class="stat-card gold">
           <div class="stat-icon" style="background:var(--amber-dim)">⚽</div>
           <p class="stat-label">Equipos</p>
@@ -233,12 +230,6 @@ function renderDashboard() {
           <p class="stat-label">Partidos</p>
           <p class="stat-value">${played}<span style="font-size:1rem;opacity:0.4">/${FIXTURES.length}</span></p>
           <p class="stat-sub">fase de grupos</p>
-        </div>
-        <div class="stat-card green">
-          <div class="stat-icon" style="background:var(--green-dim)">🎯</div>
-          <p class="stat-label">Value Bets</p>
-          <p class="stat-value" style="color:var(--green)">${valueBets.length}</p>
-          <p class="stat-sub">detectadas ahora</p>
         </div>
         <div class="stat-card gold">
           <div class="stat-icon" style="background:var(--amber-dim)">${top5[0].team.flag}</div>
@@ -299,32 +290,6 @@ function renderDashboard() {
         </div>
       </div>
 
-      <!-- Value bets destacadas -->
-      ${valueBets.length > 0 ? `
-      <div class="card p-5">
-        <h3 class="text-sm font-bold text-slate-300 uppercase tracking-wider mb-4">🎯 Alertas de Valor Activas</h3>
-        <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-3 value-bets-grid-desktop">
-          ${valueBets.slice(0,3).map(v => `
-            <div class="value-bet-alert p-4 rounded-xl">
-              <div class="flex items-center gap-2 mb-2">
-                <span class="text-2xl">${v.team.flag}</span>
-                <div>
-                  <p class="text-sm font-bold text-white">${v.team.name}</p>
-                  <p class="text-xs text-emerald-400">+${v.edge.toFixed(2)}% de ventaja</p>
-                </div>
-              </div>
-              <p class="text-xs text-slate-400">Cuota DoradoBet: <span class="text-white font-bold">${fmtOdds(v.odds)}</span></p>
-              <button onclick="switchTab('apuestas')"
-                class="mt-2 w-full text-xs bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-1.5 rounded-lg transition-colors">
-                Ver análisis →
-              </button>
-            </div>
-          `).join('')}
-        </div>
-      </div>` : ''}
-
-      <!-- ═══ RECOMENDACIONES DEL MODELO PRO ═══ -->
-      ${_renderPicksSectionHTML()}
 
     </div>`;
 
@@ -405,10 +370,11 @@ function renderTeams() {
           const p = probMap[team.shortName];
           return `
           <div class="flag-card team-card p-4" data-flag="${team.flag}" onclick="openTeamModal('${team.shortName}')">
+            <div class="absolute top-2 right-2 text-6xl opacity-10 select-none pointer-events-none" aria-hidden="true">${team.flag}</div>
             <div class="flag-accent"></div>
             <div class="flex items-start justify-between mb-3 relative z-10">
               <div class="flex items-center gap-3">
-                <span class="text-4xl leading-none drop-shadow-sm">${team.flag}</span>
+                <span class="text-5xl leading-none drop-shadow-lg">${team.flag}</span>
                 <div>
                   <p class="font-black text-white text-sm leading-tight">${team.name}</p>
                   <p class="text-[10px] text-slate-500 mt-0.5">${team.shortName} · Grupo ${team.group}</p>
@@ -717,12 +683,7 @@ function renderCalendar() {
                   // ── Footer: fecha + acción ────────────────────────────────
                   let footerAction;
                   if (!played && !isLive && !isSimFT) {
-                    footerAction = `
-                      <button onclick="startLiveSimulation(${f.id})"
-                        class="text-[11px] bg-emerald-900/50 hover:bg-emerald-700/60 text-emerald-400 hover:text-emerald-200
-                               border border-emerald-700/50 px-2 py-0.5 rounded-lg transition-all font-semibold ml-2">
-                        ▶ Simular
-                      </button>`;
+                    footerAction = '';
                   } else if (isLive) {
                     footerAction = `<span class="text-[11px] text-emerald-400 animate-pulse font-bold ml-2">⚡ EN VIVO</span>`;
                   } else if (isSimFT) {
@@ -753,16 +714,7 @@ function renderCalendar() {
                     <div class="flex items-center justify-center mt-1 flex-wrap gap-1">
                       <span class="text-xs text-slate-600">${fmtDate(f.date)} · ${f.time}</span>
                       ${footerAction}
-                      ${!played ? `
-                      <button onclick="toggleFixturePicks(${f.id}, '${f.home}', '${f.away}')"
-                        id="picks-btn-${f.id}"
-                        class="text-[11px] bg-blue-900/50 hover:bg-blue-700/50 text-blue-400 hover:text-blue-200
-                               border border-blue-700/50 px-2 py-0.5 rounded-lg transition-all font-semibold ml-1">
-                        📊 Picks
-                      </button>` : ''}
                     </div>
-                    <!-- Panel desplegable de mercados DoradoBet -->
-                    ${!played ? `<div id="fixture-picks-${f.id}" class="fixture-picks-panel hidden"></div>` : ''}
                   </div>`;
                 }).join('')}
               </div>
@@ -1693,7 +1645,6 @@ function switchTab(tab) {
     dashboard:  renderDashboard,
     equipos:    renderTeams,
     calendario: renderCalendar,
-    apuestas:   renderBetting,
     zak:        renderZakAgent,
     analytics:  renderAnalytics,
   };
