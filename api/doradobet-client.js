@@ -332,6 +332,7 @@ function extractLine(text) {
  * @param {string} awayTeam - Nombre del equipo visitante
  * @returns {object|null} - Objeto de mercados en formato estándar, o null si falla
  */
+// NOTE: DoradoBet direct client deprecated - using Puppeteer scraper in ferxxxa-markets.js
 export async function getDoradoBetMarkets(homeTeam, awayTeam) {
   console.log(`[DoradoBet] Buscando cuotas para: ${homeTeam} vs ${awayTeam}`);
 

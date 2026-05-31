@@ -1,158 +1,240 @@
 /**
  * ============================================================
- * FerXxxa Markets - Real-time Betting Odds via OddsPapi
+ * FerXxxa Markets — DoradoBet + The Odds API (80+ bookmakers)
  * ============================================================
- * Extracts 67+ betting markets from 350+ bookmakers (OddsPapi)
- * including Latin American coverage every 5 minutes.
- * Stores in Postgres for IA-Zak consumption.
+ * Estrategia de prioridad:
+ *   1. DoradoBet via Puppeteer (browser real, bypass Cloudflare)
+ *      → Intercepta VirtualSoft API en tiempo real
+ *   2. The Odds API (80+ bookmakers, Mundial 2026 disponible)
+ *   3. Fallback teórico si ambos fallan
  *
- * Usage (from vercel.json cron):
- *   GET /api/ferxxxa-markets?fixture_id=partido_id
- *
- * Data Source: OddsPapi (https://oddspapi.io)
- *   - 350+ bookmakers (Bet365, DraftKings, FanDuel, Betfair, etc.)
- *   - LatAm coverage (Betcris, Marathonbet, and more)
- *   - Real-time odds updates
- *   - Legal & authorized API access (no ToS violations)
+ * maxDuration: 60s (configurado en vercel.json)
  */
 
+import chromium from '@sparticuz/chromium-min';
+import puppeteer from 'puppeteer-core';
 import { getMatchMarkets } from './oddspapi-client.js';
-import { scrapeDoradoBetMatch } from './doradobet-scraper.js';
 import { getDb } from './_db.js';
 
-/**
- * Validate fixture ID format
- */
-function validateFixtureId(fixtureId) {
-  if (!fixtureId || typeof fixtureId !== 'string') {
-    return false;
+// Chromium remoto para serverless (no aumenta bundle size)
+const CHROMIUM_URL = 'https://github.com/Sparticuz/chromium/releases/download/v131.0.1/chromium-v131.0.1-pack.tar';
+
+// ──────────────────────────────────────────────────────────
+// 1. DORADOBET PUPPETEER SCRAPER
+// ──────────────────────────────────────────────────────────
+
+async function scrapeDoradoBet(homeTeam, awayTeam) {
+  let browser;
+  const capturedData = { markets: null, rawApis: [] };
+
+  try {
+    const execPath = await chromium.executablePath(CHROMIUM_URL);
+
+    browser = await puppeteer.launch({
+      args: [...chromium.args, '--no-sandbox', '--disable-setuid-sandbox',
+             '--disable-dev-shm-usage', '--disable-gpu', '--single-process'],
+      defaultViewport: { width: 1366, height: 768 },
+      executablePath: execPath,
+      headless: chromium.headless,
+      timeout: 20000
+    });
+
+    const page = await browser.newPage();
+
+    // Interceptar respuestas de la API de VirtualSoft
+    page.on('response', async (response) => {
+      const url = response.url();
+      if (url.includes('virtualsoft.tech') && response.status() === 200) {
+        try {
+          const ct = response.headers()['content-type'] || '';
+          if (ct.includes('application/json')) {
+            const data = await response.json();
+            if (data && !data.HasError) {
+              capturedData.rawApis.push({ url, data });
+              console.log(`[Puppeteer] ✅ API: ${url.split('/').slice(-1)[0]}`);
+            }
+          }
+        } catch {}
+      }
+    });
+
+    // Headers de browser real para pasar Cloudflare
+    await page.setUserAgent(
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
+    );
+    await page.setExtraHTTPHeaders({
+      'Accept-Language': 'es-CR,es;q=0.9',
+      'Accept': 'text/html,application/xhtml+xml,*/*;q=0.8',
+      'Sec-Fetch-Dest': 'document', 'Sec-Fetch-Mode': 'navigate',
+      'Sec-Fetch-Site': 'none', 'Upgrade-Insecure-Requests': '1'
+    });
+
+    await page.goto('https://www.doradobet.com', {
+      waitUntil: 'networkidle2', timeout: 22000
+    });
+
+    // Esperar a que el SPA cargue y haga sus llamadas API
+    await new Promise(r => setTimeout(r, 5000));
+
+    // Intentar navegar a deportes
+    try {
+      await page.evaluate(() => {
+        const links = Array.from(document.querySelectorAll('a'));
+        const sports = links.find(l =>
+          l.textContent.toLowerCase().includes('deport') ||
+          l.href.includes('deport') || l.href.includes('sport')
+        );
+        if (sports) sports.click();
+      });
+      await new Promise(r => setTimeout(r, 3000));
+    } catch {}
+
+    // Parsear datos capturados de la API
+    if (capturedData.rawApis.length > 0) {
+      capturedData.markets = parseVirtualSoftApis(capturedData.rawApis, homeTeam, awayTeam);
+    }
+
+    return {
+      markets: capturedData.markets,
+      rawCount: capturedData.rawApis.length,
+      success: capturedData.markets !== null
+    };
+
+  } catch (err) {
+    console.warn('[Puppeteer] Error:', err.message);
+    return { markets: null, rawCount: 0, success: false, error: err.message };
+  } finally {
+    if (browser) { try { await browser.close(); } catch {} }
   }
-  return fixtureId.length > 0;
 }
 
-/**
- * Main function: Fetch real market data
- * Estrategia de prioridad:
- *   1. DoradoBet directo (fuente primaria, donde el usuario apuesta)
- *   2. OddsPapi (backup, 350+ bookmakers incluyendo LatAm)
- *   3. Fallback teórico (solo si ambos fallan)
- */
-async function fetchRealMarkets(fixtureId, matchInfo = {}) {
-  const home = matchInfo.home_team || matchInfo.homeTeam || '';
-  const away = matchInfo.away_team || matchInfo.awayTeam || '';
+function parseVirtualSoftApis(responses, homeTeam, awayTeam) {
+  const markets = {};
+  const homeLower = homeTeam.toLowerCase();
+  const awayLower = awayTeam.toLowerCase();
 
-  // ── 1. INTENTO: DoradoBet via Puppeteer (browser real, bypass Cloudflare) ──
-  if (home && away) {
-    try {
-      console.log(`[FerXxxa] 🌐 DoradoBet Puppeteer para: ${home} vs ${away}`);
-      const scraped = await scrapeDoradoBetMatch(home, away);
+  for (const { url, data } of responses) {
+    const urlLower = url.toLowerCase();
+    const arr = Array.isArray(data) ? data : (data.data || data.events || data.items || []);
 
-      if (scraped?.success && scraped.markets && Object.keys(scraped.markets).length > 0) {
-        console.log(`[FerXxxa] ✅ DoradoBet Puppeteer: ${Object.keys(scraped.markets).length} mercados`);
-        return {
-          extraction_timestamp: new Date().toISOString(),
-          fixture_id: fixtureId,
-          home_team: home,
-          away_team: away,
-          markets: scraped.markets,
-          markets_found: Object.keys(scraped.markets).length,
-          data_source: 'DoradoBet (Puppeteer - fuente primaria)',
-          fallback: false,
-          source_priority: 'doradobet_puppeteer'
+    if (urlLower.includes('event') || urlLower.includes('match')) {
+      const match = Array.isArray(arr) && arr.find(evt => {
+        const h = (evt.homeTeam || evt.Home || evt.HomeTeam || '').toLowerCase();
+        const a = (evt.awayTeam || evt.Away || evt.AwayTeam || '').toLowerCase();
+        return h.includes(homeLower.split(' ')[0]) && a.includes(awayLower.split(' ')[0]);
+      });
+      if (match) {
+        const odds = match.odds || match.Odds || match.markets || [];
+        markets.result_1x2 = {
+          home: findOdd(odds, ['1','home','local']),
+          draw: findOdd(odds, ['x','draw','empate']),
+          away: findOdd(odds, ['2','away','visitante']),
+          source: 'doradobet_real'
         };
       }
-      console.warn(`[FerXxxa] DoradoBet Puppeteer sin datos (APIs: ${scraped?.rawResponses || 0}) — intentando The Odds API...`);
-    } catch (err) {
-      console.warn('[FerXxxa] DoradoBet Puppeteer error:', err.message, '— fallback a The Odds API');
     }
   }
-
-  // ── 2. INTENTO: OddsPapi (backup) ──
-  try {
-    console.log(`[FerXxxa] 📡 Intentando OddsPapi para fixture ${fixtureId}...`);
-    const marketsData = await getMatchMarkets(fixtureId, matchInfo);
-
-    if (marketsData) {
-      console.log('[FerXxxa] ✅ OddsPapi: datos obtenidos');
-      return {
-        extraction_timestamp: new Date().toISOString(),
-        fixture_id: fixtureId,
-        home_team: home || 'Home',
-        away_team: away || 'Away',
-        ...marketsData,
-        data_source: 'OddsPapi (350+ bookmakers)',
-        fallback: false,
-        source_priority: 'oddspapi'
-      };
-    }
-  } catch (oddsError) {
-    console.warn('[FerXxxa] OddsPapi error:', oddsError.message);
-  }
-
-  // ── 3. FALLBACK teórico ──
-  console.warn('[FerXxxa] Ambas fuentes fallaron — usando datos teóricos');
-  return generateFallbackData(fixtureId, matchInfo);
+  return Object.keys(markets).length > 0 ? markets : null;
 }
 
-/**
- * Generate realistic fallback market data (for testing/offline mode)
- * This is returned ONLY if OddsPapi fails
- */
-function generateFallbackData(fixtureId, matchInfo = {}) {
-  console.warn(`[FerXxxa] Using fallback data for fixture ${fixtureId} (OddsPapi unavailable)`);
+function findOdd(arr, keys) {
+  if (!Array.isArray(arr)) return null;
+  for (const o of arr) {
+    const name = (o.name || o.Name || o.outcome || '').toLowerCase();
+    if (keys.some(k => name.includes(k))) {
+      return parseFloat(o.value || o.Value || o.odds || o.Odds) || null;
+    }
+  }
+  return null;
+}
 
+// ──────────────────────────────────────────────────────────
+// 2. FALLBACK DATA (cuando ambas fuentes fallan)
+// ──────────────────────────────────────────────────────────
+
+function generateFallbackData(fixtureId, matchInfo = {}) {
   return {
     extraction_timestamp: new Date().toISOString(),
     fixture_id: fixtureId,
     home_team: matchInfo.home_team || 'Home Team',
     away_team: matchInfo.away_team || 'Away Team',
     current_score: '0:0',
-    current_minute: 0,
-    total_markets_found: 67,
+    total_markets_found: 6,
     markets: {
-      result_1x2: {
-        home: 1.75,
-        draw: 3.50,
-        away: 4.20
-      },
-      total_goals: {
-        over_0_5: 1.02, under_0_5: 20.00,
-        over_1_5: 1.12, under_1_5: 7.00,
-        over_2_5: 1.60, under_2_5: 2.70,
-        over_3_5: 2.80, under_3_5: 1.45,
-        over_4_5: 5.00, under_4_5: 1.08,
-        over_5_5: 10.00, under_5_5: 1.01
-      },
+      result_1x2: { home: 1.75, draw: 3.50, away: 4.20 },
+      total_goals: { over_0_5: 1.02, over_1_5: 1.12, over_2_5: 1.60, under_2_5: 2.70 },
       btts: { yes: 2.10, no: 1.65 },
-      yellow_cards: {
-        exact_0_3: 1.30, exact_4: 2.40, exact_5: 3.50, exact_6: 5.00,
-        over_4_5: 2.00, over_5_5: 2.80
-      },
-      corners: {
-        total_over_17_5: 1.85, total_under_17_5: 1.90
-      },
-      exact_score: {
-        '0-0': 15.00, '1-0': 5.00, '1-1': 4.00, '2-0': 8.00, '2-1': 6.50
-      }
+      yellow_cards: { over_4_5: 2.00, over_5_5: 2.80 },
+      corners: { total_over_9_5: 1.90, total_under_9_5: 1.85 },
+      exact_score: { '1-0': 5.00, '1-1': 4.00, '2-0': 8.00 }
     },
     data_quality: {
-      markets_extracted: 67,
-      odds_freshness_seconds: 60,
-      last_update: new Date().toISOString(),
-      source: 'Fallback (OddsPapi unavailable)',
-      live_match: false,
-      fallback: true
-    }
+      source: 'Theoretical fallback',
+      fallback: true,
+      last_update: new Date().toISOString()
+    },
+    fallback: true
   };
 }
 
-/**
- * Vercel handler
- * Endpoint: GET /api/ferxxxa-markets?fixture_id=123
- *
- * Called every 5 minutes by vercel.json cron job
- * Returns real odds from 350+ bookmakers (OddsPapi)
- */
+// ──────────────────────────────────────────────────────────
+// 3. ORQUESTADOR PRINCIPAL
+// ──────────────────────────────────────────────────────────
+
+async function fetchRealMarkets(fixtureId, matchInfo = {}) {
+  const home = matchInfo.home_team || matchInfo.homeTeam || '';
+  const away = matchInfo.away_team || matchInfo.awayTeam || '';
+
+  // ── Intento 1: DoradoBet via Puppeteer ──
+  if (home && away) {
+    try {
+      console.log(`[FerXxxa] 🌐 Intentando DoradoBet Puppeteer: ${home} vs ${away}`);
+      const scraped = await scrapeDoradoBet(home, away);
+
+      if (scraped.success && scraped.markets) {
+        console.log(`[FerXxxa] ✅ DoradoBet: ${Object.keys(scraped.markets).length} mercados`);
+        return {
+          extraction_timestamp: new Date().toISOString(),
+          fixture_id: fixtureId, home_team: home, away_team: away,
+          markets: scraped.markets,
+          markets_found: Object.keys(scraped.markets).length,
+          data_source: 'DoradoBet (Puppeteer - Real)',
+          fallback: false, source_priority: 'doradobet_puppeteer'
+        };
+      }
+      console.warn(`[FerXxxa] Puppeteer: sin datos (APIs capturadas: ${scraped.rawCount})`);
+    } catch (err) {
+      console.warn('[FerXxxa] Puppeteer error:', err.message);
+    }
+  }
+
+  // ── Intento 2: The Odds API (80+ bookmakers) ──
+  try {
+    console.log(`[FerXxxa] 📡 The Odds API para: ${home || fixtureId} vs ${away}`);
+    const oddsData = await getMatchMarkets(fixtureId, matchInfo);
+    if (oddsData) {
+      console.log('[FerXxxa] ✅ The Odds API: datos obtenidos');
+      return {
+        extraction_timestamp: new Date().toISOString(),
+        fixture_id: fixtureId, home_team: home || 'Home', away_team: away || 'Away',
+        ...oddsData,
+        data_source: 'The Odds API (80+ bookmakers)',
+        fallback: false, source_priority: 'the_odds_api'
+      };
+    }
+  } catch (err) {
+    console.warn('[FerXxxa] The Odds API error:', err.message);
+  }
+
+  // ── Intento 3: Fallback teórico ──
+  console.warn('[FerXxxa] Ambas fuentes fallaron — datos teóricos');
+  return generateFallbackData(fixtureId, matchInfo);
+}
+
+// ──────────────────────────────────────────────────────────
+// 4. VERCEL HANDLER
+// ──────────────────────────────────────────────────────────
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Content-Type', 'application/json');
@@ -161,60 +243,49 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Only GET requests allowed' });
   }
 
+  const { fixture_id, match_id, home_team, away_team } = req.query;
+  const fixtureId = fixture_id || match_id || `${home_team}_vs_${away_team}`;
+
+  if (!fixtureId && !home_team) {
+    return res.status(400).json({
+      error: 'Requerido: fixture_id o (home_team + away_team)',
+      example: '/api/ferxxxa-markets?home_team=Argentina&away_team=Colombia'
+    });
+  }
+
   try {
-    const { fixture_id, match_id } = req.query;
-    const fixtureId = fixture_id || match_id; // Support both parameter names
-
-    if (!fixtureId) {
-      return res.status(400).json({
-        error: 'fixture_id or match_id parameter required',
-        example: '/api/ferxxxa-markets?fixture_id=123'
-      });
-    }
-
-    if (!validateFixtureId(fixtureId)) {
-      return res.status(400).json({ error: 'Invalid fixture_id format' });
-    }
-
-    // Fetch REAL market data from OddsPapi (350+ bookmakers)
-    // Falls back to simulated data only if OddsPapi is unavailable
     const marketData = await fetchRealMarkets(fixtureId, {
-      home_team: req.query.home_team,
-      away_team: req.query.away_team
+      home_team: home_team || req.query.home,
+      away_team: away_team || req.query.away
     });
 
-    // Store in Postgres for IA-Zak to read
+    // Guardar en Postgres para que IA-Zak lo lea
     try {
       const db = await getDb();
       await db`
         INSERT INTO zak_intel (topic, match_id, studied_at, summary_json, content)
-        VALUES ('ferxxxa_markets', ${fixtureId}, NOW(), ${JSON.stringify(marketData)}, 'Real-time market data from OddsPapi (350+ bookmakers)')
+        VALUES ('ferxxxa_markets', ${fixtureId}, NOW(), ${JSON.stringify(marketData)}, 'Real-time odds - DoradoBet/TheOddsAPI')
         ON CONFLICT (topic, match_id) DO UPDATE SET
           summary_json = ${JSON.stringify(marketData)},
           studied_at = NOW()
       `;
-      console.log(`[FerXxxa] Stored markets for fixture ${fixtureId} in DB`);
-    } catch (dbError) {
-      console.error('[FerXxxa] Database storage error:', dbError.message);
-      // Continue anyway - return data even if DB fails
+    } catch (dbErr) {
+      console.error('[FerXxxa] DB error:', dbErr.message);
     }
 
     return res.status(200).json({
-      success: true,
-      fixture_id: fixtureId,
+      success: true, fixture_id: fixtureId,
       data: marketData,
       timestamp: new Date().toISOString(),
-      note: marketData.fallback ? '⚠️ Using fallback data (OddsPapi unavailable)' : '✅ Real odds from OddsPapi'
+      source: marketData.source_priority || 'unknown',
+      note: marketData.fallback
+        ? '⚠️ Datos teóricos (DoradoBet + The Odds API no disponibles)'
+        : `✅ Cuotas reales — ${marketData.data_source}`
     });
 
   } catch (error) {
-    console.error('[FerXxxa] Unhandled error:', error);
-    return res.status(500).json({
-      success: false,
-      error: error.message,
-      fallback: true
-    });
+    return res.status(500).json({ success: false, error: error.message });
   }
 }
 
-export { fetchRealMarkets, validateFixtureId, generateFallbackData };
+export { fetchRealMarkets, scrapeDoradoBet };
