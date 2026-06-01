@@ -1884,20 +1884,44 @@ FERXXXA DORADOBET INTELLIGENCE: Temporarily unavailable (${e.message})
     // =====================================================
     // 7. Return response with all Groq output + FerXxxa metadata + 5 Parlays + Player Analysis
     // =====================================================
-    // ── Build match_scenarios: use Groq output OR calculate from base probabilities ──
+    // ── Build match_scenarios: use Groq output OR extract from reasoning chain ──
     let matchScenarios = groqOutput.match_scenarios || null;
-    if (!matchScenarios && groqOutput.reasoning_chain) {
-      // Extract probabilities from reasoning chain text if Groq didn't return structured scenarios
-      const chainText = (groqOutput.reasoning_chain || []).join(' ');
-      const homeMatch = chainText.match(/(?:local|home|argentina|equipo\s*local)[^%\d]*(\d+)%/i);
-      const drawMatch = chainText.match(/empate[^%\d]*(\d+)%/i);
-      const awayMatch = chainText.match(/(?:visitante|away|colombia|equipo\s*visitante)[^%\d]*(\d+)%/i);
 
-      // Use fractions (0-1 range) for calculatePenaltyScenarios
+    // Extract team names from matchContext or detected subject
+    const homeTeamName = matchContext?.home
+      || (detectedSubject?.type === 'national_team' ? detectedSubject.name : null)
+      || 'Local';
+    const awayTeamName = matchContext?.away || 'Visitante';
+
+    if (!matchScenarios && groqOutput.reasoning_chain) {
+      // Extract probabilities from reasoning chain text
+      const chainText = (groqOutput.reasoning_chain || []).join(' ');
+
+      // Try to match named team first, then fallback to generic
+      const homePattern = new RegExp(
+        `(?:${homeTeamName}|local|home|equipo\\s*local)[^%\\d]*(\\d+)%`, 'i'
+      );
+      const awayPattern = new RegExp(
+        `(?:${awayTeamName}|visitante|away|equipo\\s*visitante)[^%\\d]*(\\d+)%`, 'i'
+      );
+
+      const homeMatch = chainText.match(homePattern);
+      const drawMatch = chainText.match(/empate[^%\d]*(\d+)%/i);
+      const awayMatch = chainText.match(awayPattern);
+
       const h = homeMatch ? parseFloat(homeMatch[1]) / 100 : 0.35;
       const d = drawMatch ? parseFloat(drawMatch[1]) / 100 : 0.30;
       const a = awayMatch ? parseFloat(awayMatch[1]) / 100 : 0.35;
       matchScenarios = calculatePenaltyScenarios(h, d, a);
+    }
+
+    // Always attach team names and home/away designation to scenarios
+    if (matchScenarios) {
+      matchScenarios.home_team_name = homeTeamName;
+      matchScenarios.away_team_name = awayTeamName;
+      // Official home/away from match context (for venue/tournament designation)
+      matchScenarios.home_is_official_home = !!matchContext?.home;
+      matchScenarios.away_is_official_away = !!matchContext?.away;
     }
 
     // ── Build injury alert ──

@@ -358,59 +358,141 @@ const ChatUI = {
     if (!scenarios) return '';
     const s = scenarios;
 
-    const bar = (pct, color) => {
-      const width = Math.max(4, Math.min(100, pct || 0));
-      return `<div class="flex-1 bg-slate-800/60 rounded-full h-1.5 overflow-hidden">
-        <div class="h-full rounded-full ${color}" style="width:${width}%"></div>
+    // ── Nombres reales de equipos (prioridad 1) ──────────────────
+    // Fallback a "Local"/"Visitante" solo si no hay nombres
+    const homeName = s.home_team_name && s.home_team_name !== 'Local'
+      ? s.home_team_name : null;
+    const awayName = s.away_team_name && s.away_team_name !== 'Visitante'
+      ? s.away_team_name : null;
+
+    // Función para renderizar nombre con localía secundaria
+    const teamLabel = (name, fallback, homeAway, colorClass) => {
+      const showLocality = name !== null; // Solo mostrar "Local"/"Visitante" si hay nombre real
+      const displayName = name || fallback;
+      const truncated = displayName.length > 14
+        ? displayName.substring(0, 12) + '…'
+        : displayName;
+      return `<div class="flex flex-col">
+        <span class="text-[11px] font-bold ${colorClass} leading-tight">${truncated}</span>
+        ${showLocality ? `<span class="text-[8px] text-slate-600 leading-none mt-0.5">${homeAway}</span>` : ''}
       </div>`;
     };
 
+    // ── Barra de probabilidad ──────────────────────────────────────
+    const bar = (pct, colorClass) => {
+      const w = Math.max(3, Math.min(100, typeof pct === 'number' ? pct : 0));
+      return `<div class="flex-1 bg-slate-800/70 rounded-full h-2 overflow-hidden">
+        <div class="h-full rounded-full ${colorClass} transition-all duration-500" style="width:${w}%"></div>
+      </div>`;
+    };
+
+    // ── Helpers de formato ─────────────────────────────────────────
+    const fmt = v => (typeof v === 'number' && v > 0) ? v + '%' : '—';
     const hasPenalties = (s.penalties_prob || 0) > 0;
 
+    // ── Calcula ancho relativo de las 3 barras (para visualización proporcional) ──
+    const h90 = s.home_win_90 || 0;
+    const d90 = s.draw_90 || 0;
+    const a90 = s.away_win_90 || 0;
+    const maxVal = Math.max(h90, d90, a90, 1);
+    const relW = v => Math.round((v / maxVal) * 100);
+
     return `
-    <div class="mt-3 mb-3 rounded-lg overflow-hidden border border-slate-700/40" style="background:rgba(15,23,42,0.5)">
-      <div class="px-3 py-2 border-b border-slate-700/30 flex items-center gap-2">
-        <span class="text-xs">⚽</span>
-        <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Escenarios del Partido</p>
+    <div class="mt-3 mb-3 rounded-xl overflow-hidden border border-slate-700/40"
+         style="background:linear-gradient(135deg, rgba(15,23,42,0.8) 0%, rgba(15,23,42,0.5) 100%);">
+
+      <!-- Header del componente -->
+      <div class="px-4 py-2.5 border-b border-slate-700/30 flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <span class="text-sm">⚽</span>
+          <p class="text-[10px] font-black text-slate-300 uppercase tracking-widest">Escenarios del Partido</p>
+        </div>
+        ${hasPenalties
+          ? `<span class="text-[9px] bg-amber-900/40 text-amber-400 border border-amber-700/40 px-2 py-0.5 rounded-full font-bold">
+               Penales posibles ${fmt(s.penalties_prob)}
+             </span>`
+          : ''}
       </div>
-      <div class="p-3 space-y-2">
 
-        <!-- 90 minutos -->
-        <p class="text-[9px] font-bold text-slate-500 uppercase tracking-widest">90 Minutos</p>
-        <div class="flex items-center gap-2">
-          <span class="text-[10px] text-slate-300 w-28">Local gana</span>
-          ${bar(s.home_win_90, 'bg-emerald-500')}
-          <span class="text-[11px] font-bold text-emerald-400 w-8 text-right">${s.home_win_90 || '—'}%</span>
-        </div>
-        <div class="flex items-center gap-2">
-          <span class="text-[10px] text-slate-300 w-28">Empate</span>
-          ${bar(s.draw_90, 'bg-amber-500')}
-          <span class="text-[11px] font-bold text-amber-400 w-8 text-right">${s.draw_90 || '—'}%</span>
-        </div>
-        <div class="flex items-center gap-2">
-          <span class="text-[10px] text-slate-300 w-28">Visitante gana</span>
-          ${bar(s.away_win_90, 'bg-blue-500')}
-          <span class="text-[11px] font-bold text-blue-400 w-8 text-right">${s.away_win_90 || '—'}%</span>
+      <!-- Sección 90 minutos -->
+      <div class="px-4 pt-3 pb-1">
+        <p class="text-[8px] font-black text-slate-500 uppercase tracking-[0.2em] mb-3">
+          Tiempo Reglamentario — 90 min.
+        </p>
+
+        <!-- Fila: equipo local -->
+        <div class="flex items-center gap-3 mb-2.5">
+          ${teamLabel(homeName, 'Local', 'Local', 'text-emerald-300')}
+          ${bar(relW(h90), 'bg-emerald-500')}
+          <span class="text-sm font-black text-emerald-400 w-10 text-right tabular-nums">${fmt(h90)}</span>
         </div>
 
-        ${hasPenalties ? `
-        <!-- Prórroga + Penales -->
-        <div class="pt-2 mt-1 border-t border-slate-700/30">
-          <p class="text-[9px] font-bold text-slate-500 uppercase tracking-widest mb-2">Si llega a Penales (${s.penalties_prob || 0}% prob.)</p>
-          <div class="grid grid-cols-2 gap-2">
-            <div class="bg-emerald-900/20 border border-emerald-700/30 rounded-lg p-2 text-center">
-              <p class="text-[9px] text-slate-400 mb-0.5">Local gana en penales</p>
-              <p class="text-sm font-black text-emerald-400">${s.home_wins_penalties || '—'}%</p>
-              <p class="text-[9px] text-emerald-600">(${s.home_penalty_advantage || 50}% ventaja)</p>
-            </div>
-            <div class="bg-blue-900/20 border border-blue-700/30 rounded-lg p-2 text-center">
-              <p class="text-[9px] text-slate-400 mb-0.5">Visitante gana en penales</p>
-              <p class="text-sm font-black text-blue-400">${s.away_wins_penalties || '—'}%</p>
-              <p class="text-[9px] text-blue-600">(${s.away_penalty_advantage || 50}% ventaja)</p>
-            </div>
+        <!-- Fila: empate -->
+        <div class="flex items-center gap-3 mb-2.5">
+          <div class="flex flex-col" style="min-width:3.5rem">
+            <span class="text-[11px] font-bold text-amber-300 leading-tight">Empate</span>
+            ${hasPenalties
+              ? `<span class="text-[8px] text-slate-600 leading-none mt-0.5">→ Prórroga</span>`
+              : ''}
           </div>
-        </div>` : ''}
+          ${bar(relW(d90), 'bg-amber-500')}
+          <span class="text-sm font-black text-amber-400 w-10 text-right tabular-nums">${fmt(d90)}</span>
+        </div>
+
+        <!-- Fila: equipo visitante -->
+        <div class="flex items-center gap-3 mb-1">
+          ${teamLabel(awayName, 'Visitante', 'Visitante', 'text-blue-300')}
+          ${bar(relW(a90), 'bg-blue-500')}
+          <span class="text-sm font-black text-blue-400 w-10 text-right tabular-nums">${fmt(a90)}</span>
+        </div>
       </div>
+
+      <!-- Sección de penales (solo si aplica) -->
+      ${hasPenalties ? `
+      <div class="mx-3 mb-3 mt-2 rounded-lg overflow-hidden border border-slate-700/30"
+           style="background:rgba(0,0,0,0.25)">
+        <div class="px-3 py-1.5 border-b border-slate-700/20">
+          <p class="text-[8px] font-black text-slate-500 uppercase tracking-[0.2em]">
+            Si llega a Penales · ${fmt(s.penalties_prob)} probabilidad
+          </p>
+        </div>
+        <div class="grid grid-cols-2 divide-x divide-slate-700/30">
+
+          <!-- Local en penales -->
+          <div class="p-3 text-center">
+            <p class="text-[10px] font-bold text-emerald-300 mb-0.5 truncate">
+              ${homeName || 'Local'}
+            </p>
+            ${homeName
+              ? `<p class="text-[8px] text-slate-600 mb-1.5">Local</p>`
+              : '<div class="mb-1.5"></div>'}
+            <p class="text-xl font-black text-emerald-400 tabular-nums leading-none">
+              ${fmt(s.home_wins_penalties)}
+            </p>
+            <p class="text-[8px] text-emerald-700 mt-1">
+              ${s.home_penalty_advantage || 50}% ventaja en tanda
+            </p>
+          </div>
+
+          <!-- Visitante en penales -->
+          <div class="p-3 text-center">
+            <p class="text-[10px] font-bold text-blue-300 mb-0.5 truncate">
+              ${awayName || 'Visitante'}
+            </p>
+            ${awayName
+              ? `<p class="text-[8px] text-slate-600 mb-1.5">Visitante</p>`
+              : '<div class="mb-1.5"></div>'}
+            <p class="text-xl font-black text-blue-400 tabular-nums leading-none">
+              ${fmt(s.away_wins_penalties)}
+            </p>
+            <p class="text-[8px] text-blue-700 mt-1">
+              ${s.away_penalty_advantage || 50}% ventaja en tanda
+            </p>
+          </div>
+
+        </div>
+      </div>` : ''}
+
     </div>`;
   },
 
