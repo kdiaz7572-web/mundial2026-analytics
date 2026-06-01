@@ -1884,18 +1884,47 @@ FERXXXA DORADOBET INTELLIGENCE: Temporarily unavailable (${e.message})
     // =====================================================
     // 7. Return response with all Groq output + FerXxxa metadata + 5 Parlays + Player Analysis
     // =====================================================
+    // ── Build match_scenarios: use Groq output OR calculate from base probabilities ──
+    let matchScenarios = groqOutput.match_scenarios || null;
+    if (!matchScenarios && groqOutput.reasoning_chain) {
+      // Extract probabilities from reasoning chain text if Groq didn't return structured scenarios
+      const chainText = (groqOutput.reasoning_chain || []).join(' ');
+      const homeMatch  = chainText.match(/(?:local|home|argentina|equipo1)[^%\d]*(\d+)%/i);
+      const drawMatch  = chainText.match(/empate[^%\d]*(\d+)%/i);
+      const awayMatch  = chainText.match(/(?:visitante|away|colombia|equipo2)[^%\d]*(\d+)%/i);
+      const penMatch   = chainText.match(/penales?[^%\d]*(\d+\.?\d*)%/i);
+
+      const h = homeMatch  ? parseFloat(homeMatch[1])  : 35;
+      const d = drawMatch  ? parseFloat(drawMatch[1])  : 30;
+      const a = awayMatch  ? parseFloat(awayMatch[1])  : 35;
+      matchScenarios = calculatePenaltyScenarios(h / 100, d / 100, a / 100);
+    }
+
+    // ── Build injury alert ──
+    const injuryAlert = groqOutput.injury_alert ||
+      (detectedInjuries.length > 0
+        ? `Bajas detectadas: ${detectedInjuries.map(i => i.name).join(', ')}. Impacto aplicado al análisis.`
+        : 'Sin datos de lesiones confirmados — indícame bajas y ajustaré las probabilidades.');
+
+    // ── Build tactical adjustments ──
+    const tacticalAdjustments = groqOutput.tactical_adjustments || null;
+
     return sendSuccess(res, {
       response: groqOutput.response || groqOutput.analysis || 'No response generated',
       reasoning_chain: groqOutput.reasoning_chain || [],
       recommendations: groqOutput.recommendations || [],
       kelly_calculations: groqOutput.kelly_calculations || null,
-      recommended_parlays: generatedParlays, // ALWAYS include 5 parlays or player suggestions
+      recommended_parlays: generatedParlays,
       data_sources_used: groqOutput.data_sources_used || [],
       uncertainties: groqOutput.uncertainties || [],
       confidence: groqOutput.confidence || 'medium',
       tool_calls: executedTools,
       bankroll_impact: bankrollImpact > 0 ? Math.round(bankrollImpact * 10000) / 100 : null,
       language: language,
+      // ===== v10.0: Nuevos campos de Ciencia de Datos =====
+      match_scenarios: matchScenarios,
+      injury_alert: injuryAlert,
+      tactical_adjustments: tacticalAdjustments,
       // ===== Player / Team / National Team Analysis =====
       player_response: playerFormattedResponse,
       team_response: teamFormattedResponse,
