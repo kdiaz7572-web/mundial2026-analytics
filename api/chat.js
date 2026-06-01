@@ -477,8 +477,10 @@ function detectMarketInMessage(message) {
  */
 function extractMatchContext(conversationHistory, currentMessage) {
   // Teams pattern: "X vs Y" or "X contra Y"
-  // Match "TeamA vs TeamB" — cap team name at 2 words max to avoid grabbing extra text
-  const vsPattern = /([A-ZÀ-Ú][a-zà-ú]+(?:\s[A-ZÀ-Ú][a-zà-ú]+)?)\s+(?:vs?\.?|contra|v\.)\s+([A-ZÀ-Ú][a-zà-ú]+(?:\s[A-ZÀ-Ú][a-zà-ú]+)?)/i;
+  // Match "TeamA vs TeamB" — names must start with uppercase letter (no /i flag)
+  // Second word of team name also must be capitalized (e.g. "Costa Rica", "Nueva Zelanda")
+  // This prevents grabbing "Colombia final" or "Francia en" — "final"/"en" are lowercase
+  const vsPattern = /([A-ZÀ-Ú][a-zà-ú]+(?:\s[A-ZÀ-Ú][a-zà-ú]+)?)\s+(?:[Vv][Ss]?\.?|[Cc]ontra|[Vv]\.)\s+([A-ZÀ-Ú][a-zà-ú]+(?:\s[A-ZÀ-Ú][a-zà-ú]+)?)(?=\s|$|,|\.|!|\?)/;
 
   // Check current message first
   const currentMatch = currentMessage.match(vsPattern);
