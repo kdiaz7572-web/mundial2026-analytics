@@ -1889,15 +1889,15 @@ FERXXXA DORADOBET INTELLIGENCE: Temporarily unavailable (${e.message})
     if (!matchScenarios && groqOutput.reasoning_chain) {
       // Extract probabilities from reasoning chain text if Groq didn't return structured scenarios
       const chainText = (groqOutput.reasoning_chain || []).join(' ');
-      const homeMatch  = chainText.match(/(?:local|home|argentina|equipo1)[^%\d]*(\d+)%/i);
-      const drawMatch  = chainText.match(/empate[^%\d]*(\d+)%/i);
-      const awayMatch  = chainText.match(/(?:visitante|away|colombia|equipo2)[^%\d]*(\d+)%/i);
-      const penMatch   = chainText.match(/penales?[^%\d]*(\d+\.?\d*)%/i);
+      const homeMatch = chainText.match(/(?:local|home|argentina|equipo\s*local)[^%\d]*(\d+)%/i);
+      const drawMatch = chainText.match(/empate[^%\d]*(\d+)%/i);
+      const awayMatch = chainText.match(/(?:visitante|away|colombia|equipo\s*visitante)[^%\d]*(\d+)%/i);
 
-      const h = homeMatch  ? parseFloat(homeMatch[1])  : 35;
-      const d = drawMatch  ? parseFloat(drawMatch[1])  : 30;
-      const a = awayMatch  ? parseFloat(awayMatch[1])  : 35;
-      matchScenarios = calculatePenaltyScenarios(h / 100, d / 100, a / 100);
+      // Use fractions (0-1 range) for calculatePenaltyScenarios
+      const h = homeMatch ? parseFloat(homeMatch[1]) / 100 : 0.35;
+      const d = drawMatch ? parseFloat(drawMatch[1]) / 100 : 0.30;
+      const a = awayMatch ? parseFloat(awayMatch[1]) / 100 : 0.35;
+      matchScenarios = calculatePenaltyScenarios(h, d, a);
     }
 
     // ── Build injury alert ──
