@@ -477,7 +477,8 @@ function detectMarketInMessage(message) {
  */
 function extractMatchContext(conversationHistory, currentMessage) {
   // Teams pattern: "X vs Y" or "X contra Y"
-  const vsPattern = /([A-ZÀ-Ú][a-zà-ú]+(?:\s[A-ZÀ-Ú][a-zà-ú]+)*)\s+(?:vs?\.?|contra|v\.)\s+([A-ZÀ-Ú][a-zà-ú]+(?:\s[A-ZÀ-Ú][a-zà-ú]+)*)/i;
+  // Match "TeamA vs TeamB" — cap team name at 2 words max to avoid grabbing extra text
+  const vsPattern = /([A-ZÀ-Ú][a-zà-ú]+(?:\s[A-ZÀ-Ú][a-zà-ú]+)?)\s+(?:vs?\.?|contra|v\.)\s+([A-ZÀ-Ú][a-zà-ú]+(?:\s[A-ZÀ-Ú][a-zà-ú]+)?)/i;
 
   // Check current message first
   const currentMatch = currentMessage.match(vsPattern);
