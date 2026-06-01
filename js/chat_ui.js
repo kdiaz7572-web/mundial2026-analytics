@@ -195,6 +195,29 @@ const ChatUI = {
       ${confBadge}
     </div>`;
 
+    // MATCH SCENARIOS (penales + prórroga)
+    if (msg.match_scenarios) {
+      html += this.renderMatchScenarios(msg.match_scenarios);
+    }
+
+    // INJURY ALERT
+    if (msg.injury_alert && msg.injury_alert !== 'null' && msg.injury_alert !== null) {
+      html += `<div class="mt-2 mb-3 px-3 py-2 bg-amber-900/20 border border-amber-600/30 rounded-lg">
+        <p class="text-[11px] text-amber-400">⚠️ ${this.escapeHtml(msg.injury_alert)}</p>
+      </div>`;
+    }
+
+    // TACTICAL ADJUSTMENTS
+    if (msg.tactical_adjustments) {
+      const ta = msg.tactical_adjustments;
+      if (ta.home !== '0%' || ta.away !== '0%') {
+        html += `<div class="mt-1 mb-2 flex gap-3 text-[10px] text-slate-500">
+          <span>⚙️ Ajuste táctico local: <strong class="text-slate-300">${this.escapeHtml(String(ta.home || '0%'))}</strong></span>
+          <span>Visitante: <strong class="text-slate-300">${this.escapeHtml(String(ta.away || '0%'))}</strong></span>
+        </div>`;
+      }
+    }
+
     // PARLAYS GRID (main UI feature)
     if (msg.recommended_parlays && Array.isArray(msg.recommended_parlays) && msg.recommended_parlays.length > 0) {
       html += this.renderParlaysGrid(msg.recommended_parlays);
@@ -273,7 +296,11 @@ const ChatUI = {
         kelly_calculations: data.kelly_calculations,
         data_sources_used: data.data_sources_used,
         confidence: data.confidence,
-        bankroll_impact: data.bankroll_impact
+        bankroll_impact: data.bankroll_impact,
+        // Nuevos campos v10.0
+        match_scenarios: data.match_scenarios,
+        injury_alert: data.injury_alert,
+        tactical_adjustments: data.tactical_adjustments
       });
 
       this.renderMessagesArea();
@@ -325,6 +352,66 @@ const ChatUI = {
     const input = document.getElementById('chat-input');
     if (btn) btn.disabled = loading;
     if (input) input.disabled = loading;
+  },
+
+  renderMatchScenarios(scenarios) {
+    if (!scenarios) return '';
+    const s = scenarios;
+
+    const bar = (pct, color) => {
+      const width = Math.max(4, Math.min(100, pct || 0));
+      return `<div class="flex-1 bg-slate-800/60 rounded-full h-1.5 overflow-hidden">
+        <div class="h-full rounded-full ${color}" style="width:${width}%"></div>
+      </div>`;
+    };
+
+    const hasPenalties = (s.penalties_prob || 0) > 0;
+
+    return `
+    <div class="mt-3 mb-3 rounded-lg overflow-hidden border border-slate-700/40" style="background:rgba(15,23,42,0.5)">
+      <div class="px-3 py-2 border-b border-slate-700/30 flex items-center gap-2">
+        <span class="text-xs">⚽</span>
+        <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Escenarios del Partido</p>
+      </div>
+      <div class="p-3 space-y-2">
+
+        <!-- 90 minutos -->
+        <p class="text-[9px] font-bold text-slate-500 uppercase tracking-widest">90 Minutos</p>
+        <div class="flex items-center gap-2">
+          <span class="text-[10px] text-slate-300 w-28">Local gana</span>
+          ${bar(s.home_win_90, 'bg-emerald-500')}
+          <span class="text-[11px] font-bold text-emerald-400 w-8 text-right">${s.home_win_90 || '—'}%</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="text-[10px] text-slate-300 w-28">Empate</span>
+          ${bar(s.draw_90, 'bg-amber-500')}
+          <span class="text-[11px] font-bold text-amber-400 w-8 text-right">${s.draw_90 || '—'}%</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="text-[10px] text-slate-300 w-28">Visitante gana</span>
+          ${bar(s.away_win_90, 'bg-blue-500')}
+          <span class="text-[11px] font-bold text-blue-400 w-8 text-right">${s.away_win_90 || '—'}%</span>
+        </div>
+
+        ${hasPenalties ? `
+        <!-- Prórroga + Penales -->
+        <div class="pt-2 mt-1 border-t border-slate-700/30">
+          <p class="text-[9px] font-bold text-slate-500 uppercase tracking-widest mb-2">Si llega a Penales (${s.penalties_prob || 0}% prob.)</p>
+          <div class="grid grid-cols-2 gap-2">
+            <div class="bg-emerald-900/20 border border-emerald-700/30 rounded-lg p-2 text-center">
+              <p class="text-[9px] text-slate-400 mb-0.5">Local gana en penales</p>
+              <p class="text-sm font-black text-emerald-400">${s.home_wins_penalties || '—'}%</p>
+              <p class="text-[9px] text-emerald-600">(${s.home_penalty_advantage || 50}% ventaja)</p>
+            </div>
+            <div class="bg-blue-900/20 border border-blue-700/30 rounded-lg p-2 text-center">
+              <p class="text-[9px] text-slate-400 mb-0.5">Visitante gana en penales</p>
+              <p class="text-sm font-black text-blue-400">${s.away_wins_penalties || '—'}%</p>
+              <p class="text-[9px] text-blue-600">(${s.away_penalty_advantage || 50}% ventaja)</p>
+            </div>
+          </div>
+        </div>` : ''}
+      </div>
+    </div>`;
   },
 
   renderParlaysGrid(parlays) {

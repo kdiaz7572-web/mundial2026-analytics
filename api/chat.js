@@ -724,34 +724,330 @@ async function executeGroqTool(toolName, toolInput) {
 }
 
 /**
+ * ========================================================================
+ * PENALTY SCENARIO CALCULATOR
+ * ========================================================================
+ * Calcula probabilidades completas: 90min + prórroga + penales
+ * Basado en:
+ *   - Probabilidades base de 90 minutos (Poisson)
+ *   - Historial estadístico en tandas de penales
+ *   - Rendimiento del portero en penales
+ */
+function calculatePenaltyScenarios(homeProb90, drawProb90, awayProb90, penaltyData = {}) {
+  // Calibrar para que sumen exactamente 1.0
+  const total = homeProb90 + drawProb90 + awayProb90;
+  const h90 = homeProb90 / total;
+  const d90 = drawProb90 / total;
+  const a90 = awayProb90 / total;
+
+  // En eliminación directa, el empate va a prórroga
+  const extraTimeProb = d90;
+
+  // ~45% de las prórrogas van a penales (estadística histórica UEFA/FIFA)
+  const penaltiesProb = extraTimeProb * 0.45;
+
+  // En los que se resuelven en prórroga (sin llegar a penales): ligeramente favorece al mejor equipo
+  const resolvedInET = extraTimeProb * 0.55;
+  const homeWinsET = resolvedInET * (h90 / (h90 + a90));
+  const awayWinsET = resolvedInET * (a90 / (h90 + a90));
+
+  // Ventaja en penales: base 50/50 + ajustes
+  let homePenaltyAdvantage = 0.50;
+
+  // Factor 1: % conversión histórica
+  if (penaltyData.homeConversion && penaltyData.awayConversion) {
+    const convDiff = (penaltyData.homeConversion - penaltyData.awayConversion) / 100;
+    homePenaltyAdvantage += convDiff * 0.3; // 30% del diferencial impacta
+  }
+
+  // Factor 2: portero mejor en tandas
+  if (penaltyData.homeGKSaveRate && penaltyData.awayGKSaveRate) {
+    const gkDiff = (penaltyData.homeGKSaveRate - penaltyData.awayGKSaveRate) / 100;
+    homePenaltyAdvantage += gkDiff * 0.4; // 40% del diferencial impacta
+  }
+
+  // Factor 3: experiencia en tandas decisivas (valor subjetivo 0-5)
+  if (penaltyData.homeExperience !== undefined && penaltyData.awayExperience !== undefined) {
+    const expDiff = (penaltyData.homeExperience - penaltyData.awayExperience) / 5;
+    homePenaltyAdvantage += expDiff * 0.05;
+  }
+
+  // Clamp entre 0.30 y 0.70
+  homePenaltyAdvantage = Math.min(0.70, Math.max(0.30, homePenaltyAdvantage));
+  const awayPenaltyAdvantage = 1 - homePenaltyAdvantage;
+
+  const homeWinsPenalties = penaltiesProb * homePenaltyAdvantage;
+  const awayWinsPenalties = penaltiesProb * awayPenaltyAdvantage;
+
+  // Probabilidades finales
+  const homeWinsTotal = h90 + homeWinsET + homeWinsPenalties;
+  const awayWinsTotal = a90 + awayWinsET + awayWinsPenalties;
+
+  return {
+    // 90 minutos
+    home_win_90:  Math.round(h90 * 1000) / 10,
+    draw_90:      Math.round(d90 * 1000) / 10,
+    away_win_90:  Math.round(a90 * 1000) / 10,
+    // Prórroga + penales
+    extra_time_prob:      Math.round(extraTimeProb * 1000) / 10,
+    penalties_prob:       Math.round(penaltiesProb * 1000) / 10,
+    home_wins_extra_time: Math.round(homeWinsET * 1000) / 10,
+    away_wins_extra_time: Math.round(awayWinsET * 1000) / 10,
+    home_wins_penalties:  Math.round(homeWinsPenalties * 1000) / 10,
+    away_wins_penalties:  Math.round(awayWinsPenalties * 1000) / 10,
+    // Totales combinados
+    home_wins_total: Math.round(homeWinsTotal * 1000) / 10,
+    away_wins_total: Math.round(awayWinsTotal * 1000) / 10,
+    // Ventaja en penales
+    home_penalty_advantage: Math.round(homePenaltyAdvantage * 100),
+    away_penalty_advantage: Math.round(awayPenaltyAdvantage * 100),
+  };
+}
+
+/**
+ * ========================================================================
+ * TACTICAL ADJUSTMENT ENGINE
+ * ========================================================================
+ * Ajusta probabilidades base según factores tácticos cuando hay datos reales.
+ * Sin datos: retorna 0% de ajuste y un aviso.
+ *
+ * @param {object} homeProfile  - { style, xg, shots, possession, pressureIntensity }
+ * @param {object} awayProfile  - idem
+ * @returns {object} { homeAdjustment, awayAdjustment, reasons, hasData }
+ */
+function calculateTacticalAdjustments(homeProfile = {}, awayProfile = {}) {
+  if (!homeProfile || !awayProfile ||
+      (homeProfile.xg === undefined && homeProfile.style === undefined)) {
+    return {
+      homeAdjustment: 0, awayAdjustment: 0,
+      reasons: ['Sin datos tácticos reales — ajuste no aplicado'],
+      hasData: false
+    };
+  }
+
+  let homeAdj = 0, awayAdj = 0;
+  const reasons = [];
+
+  // ── Factor 1: xG diferencial ──
+  if (homeProfile.xg !== undefined && awayProfile.xg !== undefined) {
+    const xgDiff = homeProfile.xg - awayProfile.xg;
+    if (Math.abs(xgDiff) >= 0.3) {
+      const adj = Math.min(4, Math.abs(xgDiff) * 8); // máx 4%
+      if (xgDiff > 0) { homeAdj += adj; reasons.push(`xG superior local (+${adj.toFixed(1)}%)`); }
+      else             { awayAdj += Math.abs(adj); reasons.push(`xG superior visitante (+${adj.toFixed(1)}%)`); }
+    }
+  }
+
+  // ── Factor 2: Tiros a puerta ──
+  if (homeProfile.shots !== undefined && awayProfile.shots !== undefined) {
+    const shotsDiff = homeProfile.shots - awayProfile.shots;
+    if (Math.abs(shotsDiff) >= 3) {
+      const adj = Math.min(2, Math.abs(shotsDiff) * 0.4);
+      if (shotsDiff > 0) { homeAdj += adj; reasons.push(`Más tiros local (+${adj.toFixed(1)}%)`); }
+      else               { awayAdj += adj; reasons.push(`Más tiros visitante (+${adj.toFixed(1)}%)`); }
+    }
+  }
+
+  // ── Factor 3: Estilo táctico ──
+  const homeStyle = (homeProfile.style || '').toLowerCase();
+  const awayStyle = (awayProfile.style || '').toLowerCase();
+
+  // Presión alta vs bloque bajo
+  if (homeStyle.includes('presion') && awayStyle.includes('bloque')) {
+    homeAdj += 3;
+    reasons.push('Presión alta vs bloque bajo (+3%)');
+  } else if (awayStyle.includes('presion') && homeStyle.includes('bloque')) {
+    awayAdj += 3;
+    reasons.push('Visitante presión alta (+3%)');
+  }
+
+  // Transición rápida vs línea alta
+  if (homeStyle.includes('transicion') && awayStyle.includes('posesion')) {
+    homeAdj += 2;
+    reasons.push('Transición vs posesión rival (+2%)');
+  } else if (awayStyle.includes('transicion') && homeStyle.includes('posesion')) {
+    awayAdj += 2;
+    reasons.push('Visitante transición (+2%)');
+  }
+
+  return {
+    homeAdjustment: Math.round(homeAdj * 10) / 10,
+    awayAdjustment: Math.round(awayAdj * 10) / 10,
+    reasons: reasons.length > 0 ? reasons : ['Factores tácticos neutros (sin diferencial significativo)'],
+    hasData: true
+  };
+}
+
+/**
+ * ========================================================================
+ * INJURY IMPACT CALCULATOR
+ * ========================================================================
+ * Aplica el impacto de lesiones mencionadas por el usuario.
+ * Si el usuario menciona una baja, ajusta la probabilidad del equipo.
+ */
+function calculateInjuryImpact(injuries = [], teamType = 'home') {
+  let probabilityImpact = 0;
+  const details = [];
+
+  for (const injury of injuries) {
+    const role = (injury.role || '').toLowerCase();
+    const impact = injury.impact; // 'star', 'key', 'rotation', 'gk'
+
+    let adj = 0;
+    if (impact === 'gk' || role.includes('portero')) {
+      adj = -6;
+      details.push(`Portero titular baja: ${injury.name} (-6%)`);
+    } else if (impact === 'star' || role.includes('goleador') || role.includes('estrella')) {
+      adj = -10;
+      details.push(`Jugador estrella baja: ${injury.name} (-10%)`);
+    } else if (impact === 'key' || role.includes('clave') || role.includes('titular')) {
+      adj = -6;
+      details.push(`Jugador clave baja: ${injury.name} (-6%)`);
+    } else if (impact === 'creator' || role.includes('creador') || role.includes('mediocampista')) {
+      adj = -5;
+      details.push(`Mediocampista constructor baja: ${injury.name} (-5%)`);
+    } else {
+      adj = -2;
+      details.push(`Baja confirmada: ${injury.name} (-2%)`);
+    }
+
+    probabilityImpact += adj;
+  }
+
+  return {
+    probabilityImpact: Math.max(-20, probabilityImpact), // Máximo -20% total
+    details,
+    hasInjuries: injuries.length > 0
+  };
+}
+
+/**
+ * ========================================================================
+ * DETECT INJURIES IN USER MESSAGE
+ * ========================================================================
+ * Detecta menciones de lesiones o bajas en el mensaje del usuario.
+ */
+function detectInjuriesInMessage(message) {
+  const msg = message.toLowerCase();
+  const injuries = [];
+
+  // Patrones: "sin X", "baja de X", "X lesionado", "X no juega", "X fuera"
+  const patterns = [
+    /(?:sin|baja de|lesionado?|no juega?|fuera[,\s]|ausente)\s+([A-ZÁÉÍÓÚÜÑ][a-záéíóúüñ]+(?:\s[A-ZÁÉÍÓÚÜÑ][a-záéíóúüñ]+)?)/gi,
+    /([A-ZÁÉÍÓÚÜÑ][a-záéíóúüñ]+(?:\s[A-ZÁÉÍÓÚÜÑ][a-záéíóúüñ]+)?)\s+(?:está|esta)\s+(?:lesionado?|baja|fuera)/gi,
+    /([A-ZÁÉÍÓÚÜÑ][a-záéíóúüñ]+)\s+(?:no\s+jugará|no\s+juega|no\s+está)/gi
+  ];
+
+  for (const pattern of patterns) {
+    let match;
+    while ((match = pattern.exec(message)) !== null) {
+      const name = match[1] || match[2];
+      if (name && name.length > 2) {
+        injuries.push({ name: name.trim(), impact: 'key', role: 'unknown' });
+      }
+    }
+  }
+
+  return injuries;
+}
+
+/**
  * System prompt templates for Spanish and English
- * CLAUDE-LIKE REASONING: Step-by-step transparency with source citations
- * ENHANCED v5.0: 5-Parlay generation with varying risk profiles
+ * ENHANCED v10.0: Penalty scenarios + Tactical adjustments + Injury handling
  */
 const SYSTEM_PROMPTS = {
-  es: `Eres IA-Zak v9.0 - Especialista en Apuestas Deportivas. MODO QUIRÚRGICO ACTIVADO.
+  es: `Eres IA-Zak v10.0 - Especialista en Apuestas Deportivas. MODO QUIRÚRGICO + CIENCIA DE DATOS.
 
-REGLA ABSOLUTA DE RESPUESTA:
-Analiza la pregunta del usuario. El sistema ya detectó el mercado exacto y te lo pasa en el contexto.
+═══════════════════════════════════════════════════════
+METODOLOGÍA DE ANÁLISIS (basada en Ciencia de Datos)
+═══════════════════════════════════════════════════════
+
+PASO 1 — FORMA RECIENTE
+Analiza los últimos 5-10 partidos oficiales de cada equipo:
+- Goles a favor/en contra por partido
+- Solidez defensiva (clean sheets)
+- Rendimiento específico en la competición del partido (Champions, Liga, Copa)
+- Tendencia: ¿está el equipo en alza o en caída?
+
+PASO 2 — LESIONES E INDISPONIBLES
+⚠️ SIEMPRE pregunta o advierte: "¿Hay bajas importantes confirmadas?"
+Si el usuario menciona una lesión, ajusta la probabilidad:
+- Baja del goleador/creador principal: -8% a -12% probabilidad de victoria
+- Baja de defensa clave: -5% a -8%
+- Baja del portero titular: +15% goles esperados del rival, -5% victoria
+- Baja de mediocampista constructor: -4% a -6%
+Si NO hay info de lesiones: incluye "[⚠️ Sin datos de lesiones confirmados — indícame bajas y ajusto]"
+
+PASO 3 — FACTORES TÁCTICOS (ajustan probabilidades numéricamente)
+Cuando tengas datos de xG, posesión o tiros:
+┌─────────────────────────────────────────────────────┐
+│ PERFIL TÁCTICO          │ AJUSTE PROBABILIDAD       │
+├─────────────────────────┼───────────────────────────┤
+│ Presión alta vs bloque  │ Presión alta: +3%         │
+│ bajo si diferencia       │                           │
+│ física/fitness clara     │                           │
+├─────────────────────────┼───────────────────────────┤
+│ Posesión vs Transición  │ Transición: +2% si rival  │
+│                         │ línea defensiva alta       │
+├─────────────────────────┼───────────────────────────┤
+│ xG superior (>0.3 dif.) │ Equipo con más xG: +4%   │
+├─────────────────────────┼───────────────────────────┤
+│ Tiros a puerta >3 dif.  │ Equipo más eficaz: +2%   │
+└─────────────────────────┴───────────────────────────┘
+
+Sin datos reales → aplica 0% ajuste táctico y notifica.
+
+PASO 4 — ESCENARIOS DE TIEMPO REGLAMENTARIO (siempre incluir)
+Calcula y presenta siempre:
+- P(Local gana en 90min) = X%
+- P(Empate en 90min) = X%
+- P(Visitante gana en 90min) = X%
+
+PASO 5 — ESCENARIOS DE PRÓRROGA Y PENALES
+SIEMPRE incluir este análisis cuando P(Empate) > 20% O cuando el usuario pregunte:
+
+CÁLCULO DE PENALES:
+- P(Llega a tiempo extra) = P(Empate 90min) en partidos de eliminación directa
+- P(Definición en penales) = P(Empate tras prórroga) ≈ 45% de los que van a prórroga
+- En penales: ventaja para el equipo con:
+  • Mayor % conversión histórica (si > 75%: +5%)
+  • Portero con mejor registro en tandas (si > 30% paradas: +7%)
+  • Mayor experiencia en tandas decisivas (+3%)
+  • Local/favorito psicológico (+2%)
+
+TABLA DE ESCENARIOS COMPLETA (incluir siempre):
+| Escenario                    | Probabilidad |
+|------------------------------|-------------|
+| Local gana 90min             | X%          |
+| Visitante gana 90min         | X%          |
+| Empate → Prórroga            | X%          |
+| Local gana en penales        | X%          |
+| Visitante gana en penales    | X%          |
+
+═══════════════════════════════════════════════════════
+REGLA ABSOLUTA DE RESPUESTA (mercados quirúrgicos)
+═══════════════════════════════════════════════════════
+
 NUNCA sugieras mercados que no son el foco de la pregunta.
 
 MERCADOS VÁLIDOS POR TIPO DE PREGUNTA:
-• Tarjetas/Amarillas/Rojas     → SOLO markets de cards: "Tarjetas Totales", "Amonestados"
-• Córners/Esquinas             → SOLO markets de corners: "Córners Totales", "Córners 1er Tiempo"
+• Tarjetas/Amarillas/Rojas     → SOLO cards: "Tarjetas Totales", "Amonestados"
+• Córners/Esquinas             → SOLO corners: "Córners Totales", "Córners 1er Tiempo"
 • Goles de jugador específico  → SOLO "Anota 1+", "Primer Goleador", "Doblete"
-• Over/Under goles del partido → SOLO "Total Goles", jamás 1x2 ni cards
-• BTTS/Ambos anotan            → SOLO "BTTS Sí" y combinaciones con Over
+• Over/Under goles del partido → SOLO "Total Goles"
+• BTTS/Ambos anotan            → SOLO "BTTS Sí" + combinaciones Over
 • Hándicap                     → SOLO "Hándicap Asiático -0.5/-1/-1.5"
 • Resultado/1x2                → SOLO "Victoria Local/Visitante/Empate"
-• General/sin mercado          → 5 parlays multi-mercado (lo habitual)
+• Penales/Prórroga             → Tabla de escenarios completa
+• General/sin mercado          → 5 parlays multi-mercado
 
 FLUJO OBLIGATORIO:
-1. Identifica el partido: usa {MATCH_CONTEXT} si está disponible
-2. Identifica el mercado exacto: usa {MARKET_INTENT}
-3. Consulta Fercha: usa las cuotas en {FERXXXA_MARKETS} para ese mercado
-4. Si NO hay cuotas DoradoBet: di "Sin cuotas DoradoBet en vivo para este mercado. ¿Uso datos históricos?"
-5. Genera exactamente 3 parlays del mercado solicitado: Conservadora, Moderada, Agresiva
-6. Cada parlay: monto ₡ exacto, cuota real de DoradoBet si existe, probabilidad, ganancia
+1. Identifica partido: usa {MATCH_CONTEXT}
+2. Identifica mercado exacto: usa {MARKET_INTENT}
+3. Aplica Pasos 1-5 de la metodología anterior
+4. Consulta Fercha: {FERXXXA_MARKETS}
+5. Si NO hay cuotas: "Sin cuotas en vivo. ¿Uso datos históricos?"
+6. Genera 3 parlays del mercado solicitado: Conservadora, Moderada, Agresiva
 
 DATOS DISPONIBLES:
 - FerXxxa/DoradoBet Markets: {FERXXXA_MARKETS}
@@ -760,38 +1056,50 @@ DATOS DISPONIBLES:
 
 KELLY: kelly_% = edge / (odds - 1). Si kelly > 25%: usa 50% Fractional Kelly.
 
-CORRECCIÓN DE CORRELACIÓN:
+CORRELACIÓN:
 - Home Win + Over 2.5 = +corr → ×1.08
 - Home Win + Under 2.5 = -corr → ×0.88
 - BTTS + Over 2.5 = muy corr → ×1.12
 
-JSON REQUERIDO (siempre este formato):
+JSON REQUERIDO:
 {
-  "response": "Texto CORTO y directo respondiendo exactamente lo preguntado",
-  "reasoning_chain": ["1. Mercado detectado: X", "2. Cuotas DoradoBet: ...", "3. Probabilidad calculada: ...", "4. Kelly = X%"],
+  "response": "Texto CORTO y directo",
+  "reasoning_chain": ["1. Forma reciente: ...", "2. Lesiones: ...", "3. Táctico: ajuste X%", "4. Probabilidades 90min: ...", "5. Penales: ..."],
+  "match_scenarios": {
+    "home_win_90": 0.35,
+    "draw_90": 0.30,
+    "away_win_90": 0.35,
+    "extra_time_prob": 0.30,
+    "penalties_prob": 0.135,
+    "home_wins_penalties": 0.065,
+    "away_wins_penalties": 0.070
+  },
+  "injury_alert": "Sin datos confirmados / o descripción del impacto si hay bajas",
+  "tactical_adjustments": {"home": "+2% (presión alta)", "away": "0%"},
   "confidence": "high|medium|low",
   "data_source": "doradobet_real|theoretical|mixed",
   "recommended_parlays": [
     {
       "name": "Conservadora - [Mercado específico]",
       "risk_profile": "conservative",
-      "market_type": "[cards|corners|goals|btts|1x2|etc]",
+      "market_type": "[cards|corners|goals|btts|1x2|penalties|etc]",
       "kelly_percentage": 4.2,
       "bankroll_amount_colones": 2100,
       "expected_win_colones": 5586,
       "combined_odds": 3.41,
       "events": [
-        {"market": "[EXACTAMENTE el mercado preguntado]", "prediction": "...", "odds": 1.75, "source": "doradobet_real"}
+        {"market": "[mercado exacto]", "prediction": "...", "odds": 1.75, "source": "doradobet_real"}
       ],
-      "detailed_reasoning": "Por qué esta apuesta específica para ESTE mercado"
+      "detailed_reasoning": "Por qué esta apuesta + factores tácticos/lesiones aplicados"
     }
   ],
   "warnings": [],
   "no_data_alert": null
 }
 
-REGLAS:
-- Si sin datos DoradoBet: no inventes cuotas, usa "source": "theoretical" y avisa
+REGLAS FINALES:
+- Sin datos DoradoBet: "source": "theoretical" + aviso
+- Sin datos de lesiones: incluye el warning de lesiones SIEMPRE
 - Máximo ₡50,000 por apuesta
 - Cita [DoradoBet: X.XX] cuando tengas cuota real`,
 
@@ -996,7 +1304,7 @@ export default async function handler(req, res) {
     }
 
     // =====================================================
-    // 2.0.0 DETECT MARKET INTENT + MATCH CONTEXT (NLP Quirúrgico)
+    // 2.0.0 DETECT MARKET INTENT + MATCH CONTEXT + INJURIES + TACTICS
     // =====================================================
     const detectedMarket = detectMarketInMessage(sanitizedMessage);
     const matchContext = extractMatchContext(conversationHistory, sanitizedMessage);
@@ -1004,10 +1312,37 @@ export default async function handler(req, res) {
     console.log(`[chat] 🎯 Market detected: ${detectedMarket.market} (${detectedMarket.label})`);
     console.log(`[chat] ⚽ Match context: ${matchContext ? `${matchContext.home} vs ${matchContext.away}${matchContext.fromHistory ? ' (from history)' : ''}` : 'none'}`);
 
+    // ── Detectar lesiones en el mensaje ──
+    const detectedInjuries = detectInjuriesInMessage(sanitizedMessage);
+    if (detectedInjuries.length > 0) {
+      console.log(`[chat] 🏥 Injuries detected: ${detectedInjuries.map(i => i.name).join(', ')}`);
+    }
+
+    // ── Calcular escenarios de penales (base 35/30/35) ──
+    // Se refinan con Groq más adelante; aquí pre-calculamos para inyectar en contexto
+    const baseScenarios = calculatePenaltyScenarios(0.35, 0.30, 0.35);
+    const penaltyContext = `Escenarios base (se ajustan con datos reales):
+  - Local gana 90min: ${baseScenarios.home_win_90}%
+  - Empate/Prórroga: ${baseScenarios.draw_90}%
+  - Visitante gana 90min: ${baseScenarios.away_win_90}%
+  - Probabilidad de llegar a penales: ${baseScenarios.penalties_prob}%`;
+
     // Inject match context into userContext
     if (matchContext) {
       userContext += `\n- Partido activo: ${matchContext.home} vs ${matchContext.away}${matchContext.fromHistory ? ' (del historial de conversación)' : ''}`;
     }
+
+    // Inject injury info
+    if (detectedInjuries.length > 0) {
+      const injuryImpact = calculateInjuryImpact(detectedInjuries, 'home');
+      userContext += `\n- Lesiones detectadas en pregunta: ${detectedInjuries.map(i => i.name).join(', ')}`;
+      userContext += `\n- Impacto estimado: ${injuryImpact.details.join(', ')} (Total: ${injuryImpact.probabilityImpact}%)`;
+    } else {
+      userContext += `\n- Lesiones: No mencionadas — incluir aviso "[⚠️ Sin datos de lesiones]" en respuesta`;
+    }
+
+    // Inject penalty scenarios context
+    userContext += `\n- ${penaltyContext}`;
 
     // Inject market intent into userContext
     userContext += `\n- Mercado detectado en la pregunta: ${detectedMarket.label} (${detectedMarket.market})`;
