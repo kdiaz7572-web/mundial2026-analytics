@@ -13,7 +13,7 @@
 // ============================================================
 
 import { getDb } from './_db.js';
-import { getWorldCupScores } from './_lib/oddspapi-client.js';
+import { getWorldCupScores, getUpcomingMatches } from './_lib/oddspapi-client.js';
 
 // Nombre completo (inglés, como lo devuelve The Odds API) → shortName local
 const NAME_TO_SHORT = {
@@ -100,12 +100,10 @@ export default async function handler(req, res) {
 
   // ── Debug temporal: ver el calendario REAL crudo de The Odds API ──
   if (req.query.peek) {
-    const events = await getWorldCupScores(7);
+    const events = await getUpcomingMatches();
     const sample = (events || []).map(e => ({
-      home: e.home_team, away: e.away_team,
-      commence: e.commence_time, completed: e.completed,
-      scores: e.scores,
-    }));
+      home: e.home_team, away: e.away_team, commence: e.commence_time,
+    })).sort((a, b) => (a.commence || '').localeCompare(b.commence || ''));
     return res.status(200).json({ ok: true, count: sample.length, events: sample });
   }
 
