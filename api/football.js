@@ -74,6 +74,26 @@ export default async function handler(req, res) {
         cacheKey  = `player:${id}:${season}`;
         break;
       }
+      case 'fixtures': {
+        // World Cup = league 1. season=2026 para el Mundial 2026.
+        endpoint = `https://v3.football.api-sports.io/fixtures?league=1&season=${season}`;
+        cacheKey  = `fixtures:${season}`;
+        break;
+      }
+      case 'standings': {
+        endpoint = `https://v3.football.api-sports.io/standings?league=1&season=${season}`;
+        cacheKey  = `standings:${season}`;
+        break;
+      }
+      case '_debug_raw': {
+        // Temporal: prueba directa a un endpoint arbitrario para validar acceso del plan
+        const ep = req.query.endpoint || 'status';
+        const r = await fetch(`https://v3.football.api-sports.io/${ep}`, {
+          headers: { 'x-rapidapi-key': API_KEY, 'x-rapidapi-host': 'v3.football.api-sports.io' },
+        });
+        const j = await r.json();
+        return res.status(r.status).json({ ok: r.ok, status: r.status, body: j });
+      }
       default:
         return res.status(400).json({ ok: false, error: `Unknown action: ${action}` });
     }
