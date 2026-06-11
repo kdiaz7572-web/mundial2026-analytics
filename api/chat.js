@@ -16,9 +16,9 @@ import {
   calculateRiskOfRuin,
   calculateEdge
 } from '../js/kelly_calculator.js';
-import { analyzePlayer } from './player-analyzer.js';
-import { detectSubject, analyzeTeam } from './team-analyzer.js';
-import { generateSmartSuggestions, generatePlayerBettingSuggestions } from './smart-suggestions.js';
+import { analyzePlayer } from './_lib/player-analyzer.js';
+import { detectSubject, analyzeTeam } from './_lib/team-analyzer.js';
+import { generateSmartSuggestions, generatePlayerBettingSuggestions } from './_lib/smart-suggestions.js';
 
 // Inline simple utility functions to avoid middleware import issues
 const sanitizeInput = (input) => {

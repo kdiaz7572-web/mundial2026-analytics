@@ -13,7 +13,7 @@
 
 import chromium from '@sparticuz/chromium-min';
 import puppeteer from 'puppeteer-core';
-import { getMatchMarkets } from './oddspapi-client.js';
+import { getMatchMarkets } from './_lib/oddspapi-client.js';
 import { getDb } from './_db.js';
 
 // Chromium remoto para serverless (no aumenta bundle size)
