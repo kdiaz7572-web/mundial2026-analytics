@@ -51,6 +51,14 @@ const getTeam    = sn  => TEAMS.find(t => t.shortName === sn);
 const fmtDate    = iso => new Date(iso + 'T00:00').toLocaleDateString('es-ES', { day:'2-digit', month:'short' });
 const fmtOdds    = n   => n.toFixed(2);
 
+// Bandera real (flagcdn). flagcdn soporta subdivisiones gb-eng / gb-sct.
+function flagImg(iso2, cls){ if(!iso2) return ''; return '<img src="https://flagcdn.com/h20/'+iso2+'.png" srcset="https://flagcdn.com/h40/'+iso2+'.png 2x" width="20" loading="lazy" alt="" class="'+(cls||'')+'" style="display:inline-block;border-radius:2px;vertical-align:middle;box-shadow:0 0 1px rgba(0,0,0,.4)">'; }
+window.flagImg = flagImg;
+
+// Fecha/hora en zona horaria local del dispositivo a partir del campo utc.
+const localDate = utc => new Date(utc).toLocaleDateString('en-CA');               // 'YYYY-MM-DD'
+const localTime = utc => new Date(utc).toLocaleTimeString([], {hour:'numeric', minute:'2-digit'}); // "1:00 PM"
+
 function formBadges(form) {
   return form.slice(-5).map(r =>
     `<span class="form-badge form-${r}">${r}</span>`
@@ -233,7 +241,7 @@ function renderDashboard() {
           <div class="flex gap-2 mt-5 justify-center flex-wrap">
             ${top5.slice(0,5).map(p => `
               <div class="flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-white/10 bg-white/5 backdrop-blur-sm">
-                <span class="text-base leading-none">${p.team.flag}</span>
+                <span class="text-base leading-none">${p.team.iso2 ? flagImg(p.team.iso2) : p.team.flag}</span>
                 <span class="text-[11px] font-bold text-slate-300">${p.team.shortName}</span>
                 <span class="text-[10px] text-amber-400 font-mono">${p.probability}%</span>
               </div>`).join('')}
@@ -273,7 +281,7 @@ function renderDashboard() {
             ${top5.map(p => `
               <div class="flex items-center gap-3">
                 ${rankBadge(p.rank)}
-                <span class="text-xl">${p.team.flag}</span>
+                <span class="text-xl">${p.team.iso2 ? flagImg(p.team.iso2) : p.team.flag}</span>
                 <span class="text-sm font-semibold text-slate-200 w-28 truncate">${p.team.name}</span>
                 <div class="flex-1">
                   <div class="prob-bar-container">
@@ -296,16 +304,16 @@ function renderDashboard() {
               <div class="match-card">
                 <div class="flex items-center justify-between gap-2">
                   <div class="flex items-center gap-2 flex-1">
-                    <span class="text-xl leading-none">${h?.flag || '🏳️'}</span>
+                    <span class="text-xl leading-none">${h?.iso2 ? flagImg(h.iso2) : (h?.flag || '🏳️')}</span>
                     <span class="text-xs font-bold text-white">${h?.name || f.home}</span>
                   </div>
                   <div class="text-center flex-shrink-0 px-1">
-                    <p class="text-[9px] text-slate-600 font-mono">${fmtDate(f.date)}</p>
+                    <p class="text-[9px] text-slate-600 font-mono">${fmtDate(localDate(f.utc))}</p>
                     <p class="text-[9px] font-bold text-amber-500">${f.group ? 'Gr.'+f.group : 'KO'}</p>
                   </div>
                   <div class="flex items-center gap-2 flex-1 justify-end">
                     <span class="text-xs font-bold text-white">${a?.name || f.away}</span>
-                    <span class="text-xl leading-none">${a?.flag || '🏳️'}</span>
+                    <span class="text-xl leading-none">${a?.iso2 ? flagImg(a.iso2) : (a?.flag || '🏳️')}</span>
                   </div>
                 </div>
               </div>`;
@@ -398,7 +406,7 @@ function renderTeams() {
             <div class="flag-accent"></div>
             <div class="flex items-start justify-between mb-3 relative z-10">
               <div class="flex items-center gap-3">
-                <span class="text-5xl leading-none drop-shadow-lg">${team.flag}</span>
+                <span class="leading-none drop-shadow-lg">${team.iso2 ? flagImg(team.iso2, 'h-9 w-auto') : `<span class="text-5xl">${team.flag}</span>`}</span>
                 <div>
                   <p class="font-black text-white text-sm leading-tight">${team.name}</p>
                   <p class="text-[10px] text-slate-500 mt-0.5">${team.shortName} · Grupo ${team.group}</p>
@@ -464,7 +472,7 @@ function openTeamModal(shortName) {
 
   openModal(`
     <div class="text-center mb-5">
-      <div class="text-6xl mb-2">${team.flag}</div>
+      <div class="mb-2 flex justify-center">${team.iso2 ? flagImg(team.iso2, 'h-12 w-auto') : `<span class="text-6xl">${team.flag}</span>`}</div>
       <h2 class="text-xl font-bold text-white">${team.name}</h2>
       <p class="text-slate-400 text-sm">${team.confederation} · Grupo ${team.group} · FIFA #${team.fifaRanking}</p>
     </div>
@@ -625,7 +633,7 @@ function renderMatchCard(f, todayStr, opts = {}) {
   const h = getTeam(f.home), a = getTeam(f.away);
   if (!h || !a) return '';
   const played   = f.homeGoals !== null;
-  const isToday  = f.date === todayStr;
+  const isToday  = localDate(f.utc) === todayStr;
   const ld       = AppState.getLive(f.id);
   const isLive   = ld && ['1H','HT','2H'].includes(ld.status);
   const isSimFT  = !played && ld && ld.status === 'FT';
@@ -652,7 +660,7 @@ function renderMatchCard(f, todayStr, opts = {}) {
       <span class="text-slate-500 text-sm">–</span>
       <span class="text-lg font-extrabold text-slate-300">${ld.awayGoals}</span>`;
   } else {
-    scoreHtml = `<span class="text-sm font-bold text-slate-300">${f.time}</span>`;
+    scoreHtml = `<span class="text-sm font-bold text-slate-300">${localTime(f.utc)}</span>`;
   }
 
   const liveStatsRow = isLive ? `
@@ -690,20 +698,20 @@ function renderMatchCard(f, todayStr, opts = {}) {
   <div id="match-card-${f.id}" class="match-card ${played ? 'played' : ''} ${extraClass}">
     <div class="flex items-center gap-2">
       <div class="flex items-center gap-2 flex-1 min-w-0">
-        <span class="text-xl">${h.flag}</span>
+        <span class="text-xl">${h.iso2 ? flagImg(h.iso2) : h.flag}</span>
         <span class="text-xs font-semibold text-white truncate">${h.shortName}</span>
       </div>
       <div class="flex items-center gap-1 shrink-0">${scoreHtml}</div>
       <div class="flex items-center gap-2 flex-1 min-w-0 justify-end">
         <span class="text-xs font-semibold text-white truncate">${a.shortName}</span>
-        <span class="text-xl">${a.flag}</span>
+        <span class="text-xl">${a.iso2 ? flagImg(a.iso2) : a.flag}</span>
       </div>
     </div>
     ${liveStatsRow}
     <div class="flex items-center justify-center mt-1 flex-wrap gap-1.5">
       ${isToday ? `<span class="text-[10px] font-extrabold text-black bg-amber-400 px-1.5 py-0.5 rounded">HOY</span>` : ''}
       ${groupBadge}
-      <span class="text-xs text-slate-600">${f.time}</span>
+      <span class="text-xs text-slate-600">${localTime(f.utc)}</span>
       ${footerAction}
     </div>
   </div>`;
@@ -733,7 +741,7 @@ function renderGroupStandingsCard(group) {
               <td>${i+1}</td>
               <td>
                 <div class="flex items-center gap-2">
-                  <span>${s.team.flag}</span>
+                  <span>${s.team.iso2 ? flagImg(s.team.iso2) : s.team.flag}</span>
                   <span class="font-semibold text-white">${s.team.shortName}</span>
                 </div>
               </td>
@@ -771,14 +779,12 @@ function renderAllStandings() {
 
 // ——— Sub-vista: CALENDARIO (todos los partidos, cronológico, HOY primero) ———
 function renderCalendarMatches() {
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayStr = new Date().toLocaleDateString('en-CA'); // HOY local
 
-  // Ordenar todos los fixtures por fecha + hora y agrupar por fecha
-  const sorted = [...FIXTURES].sort((a, b) =>
-    a.date.localeCompare(b.date) || a.time.localeCompare(b.time)
-  );
+  // Ordenar todos los fixtures por fecha+hora local (utc) y agrupar por fecha local
+  const sorted = [...FIXTURES].sort((a, b) => a.utc.localeCompare(b.utc));
   const byDate = {};
-  sorted.forEach(f => { (byDate[f.date] = byDate[f.date] || []).push(f); });
+  sorted.forEach(f => { const d = localDate(f.utc); (byDate[d] = byDate[d] || []).push(f); });
 
   const allDates = Object.keys(byDate).sort();
   // Orden: hoy y futuro ascendente primero, luego días pasados al final

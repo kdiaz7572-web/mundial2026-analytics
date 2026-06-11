@@ -13,22 +13,20 @@
 // ============================================================
 
 import { getDb } from './_db.js';
-import { getWorldCupScores, getUpcomingMatches } from './_lib/oddspapi-client.js';
+import { getWorldCupScores } from './_lib/oddspapi-client.js';
 
 // Nombre completo (inglés, como lo devuelve The Odds API) → shortName local
 const NAME_TO_SHORT = {
-  'united states': 'USA', 'usa': 'USA', 'panama': 'PAN', 'uruguay': 'URU', 'morocco': 'MAR',
-  'mexico': 'MEX', 'ecuador': 'ECU', 'poland': 'POL', 'cameroon': 'CMR',
-  'canada': 'CAN', 'honduras': 'HON', 'japan': 'JPN', 'jamaica': 'JAM',
-  'argentina': 'ARG', 'spain': 'ESP', 'saudi arabia': 'KSA', 'belgium': 'BEL',
-  'brazil': 'BRA', 'australia': 'AUS', 'germany': 'GER', 'dr congo': 'COD', 'congo dr': 'COD',
-  'france': 'FRA', 'venezuela': 'VEN', 'iran': 'IRN', 'nigeria': 'NGA',
-  'england': 'ENG', 'south korea': 'KOR', 'korea republic': 'KOR', 'colombia': 'COL', 'ivory coast': 'CIV', "cote d'ivoire": 'CIV',
-  'portugal': 'POR', 'albania': 'ALB', 'egypt': 'EGY', 'qatar': 'QAT',
-  'netherlands': 'NED', 'uzbekistan': 'UZB', 'senegal': 'SEN', 'south africa': 'RSA',
-  'croatia': 'CRO', 'ghana': 'GHA', 'serbia': 'SRB', 'jordan': 'JOR',
-  'switzerland': 'SUI', 'indonesia': 'IDN', 'turkey': 'TUR', 'turkiye': 'TUR', 'scotland': 'SCO', 'new zealand': 'NZL',
-  'austria': 'AUT', 'hungary': 'HUN', 'denmark': 'DEN', 'tunisia': 'TUN',
+  'mexico':'MEX','south africa':'RSA','south korea':'KOR','czech republic':'CZE',
+  'canada':'CAN','bosnia & herzegovina':'BIH','bosnia and herzegovina':'BIH','qatar':'QAT','switzerland':'SUI',
+  'usa':'USA','united states':'USA','paraguay':'PAR','brazil':'BRA','morocco':'MAR','haiti':'HAI','scotland':'SCO',
+  'australia':'AUS','turkey':'TUR','turkiye':'TUR','germany':'GER','curacao':'CUW','curaçao':'CUW',
+  'netherlands':'NED','japan':'JPN','ivory coast':'CIV',"cote d'ivoire":'CIV','ecuador':'ECU',
+  'sweden':'SWE','tunisia':'TUN','spain':'ESP','cape verde':'CPV','saudi arabia':'KSA','uruguay':'URU',
+  'belgium':'BEL','egypt':'EGY','iran':'IRN','new zealand':'NZL','france':'FRA','senegal':'SEN',
+  'iraq':'IRQ','norway':'NOR','argentina':'ARG','algeria':'ALG','austria':'AUT','jordan':'JOR',
+  'portugal':'POR','dr congo':'COD','congo dr':'COD','england':'ENG','croatia':'CRO','ghana':'GHA',
+  'panama':'PAN','uzbekistan':'UZB','colombia':'COL',
 };
 
 function toShort(name) {
@@ -97,15 +95,6 @@ export default async function handler(req, res) {
   // Cron de Vercel manda header especial; también aceptamos ?sync=1 manual
   const isCron = !!req.headers['x-vercel-cron'];
   const forceSync = req.query.sync === '1' || isCron;
-
-  // ── Debug temporal: ver el calendario REAL crudo de The Odds API ──
-  if (req.query.peek) {
-    const events = await getUpcomingMatches();
-    const sample = (events || []).map(e => ({
-      home: e.home_team, away: e.away_team, commence: e.commence_time,
-    })).sort((a, b) => (a.commence || '').localeCompare(b.commence || ''));
-    return res.status(200).json({ ok: true, count: sample.length, events: sample });
-  }
 
   try {
     const db = await getDb();

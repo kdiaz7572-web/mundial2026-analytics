@@ -9,6 +9,12 @@
 (function () {
   'use strict';
 
+  // Bandera real (flagcdn). Copia local para no depender de carga de app.js.
+  function flagImg(iso2, cls) {
+    if (!iso2) return '';
+    return '<img src="https://flagcdn.com/h20/' + iso2 + '.png" srcset="https://flagcdn.com/h40/' + iso2 + '.png 2x" width="20" loading="lazy" alt="" class="' + (cls || '') + '" style="display:inline-block;border-radius:2px;vertical-align:middle;box-shadow:0 0 1px rgba(0,0,0,.4)">';
+  }
+
   // Escapa texto para usar en HTML / atributos.
   function esc(s) {
     return String(s == null ? '' : s)
@@ -38,9 +44,12 @@
     }
 
     const short = esc(slot.short);
+    // Slot real: usar bandera flagcdn vía iso2 del equipo global; emoji como fallback.
+    const iso2 = (typeof getTeam === 'function' && getTeam(slot.short)) ? getTeam(slot.short).iso2 : null;
+    const flagHtml = iso2 ? flagImg(iso2) : flag;
     return `
       <div class="bv-slot" title="${name}">
-        <span class="bv-flag">${flag}</span>
+        <span class="bv-flag">${flagHtml}</span>
         <span class="bv-short">${short}</span>
         <span class="bv-name">${name}</span>
       </div>`;
@@ -83,8 +92,10 @@
     const chips = list
       .map((t) => {
         if (!t) return '';
+        const iso2 = (typeof getTeam === 'function' && getTeam(t.short)) ? getTeam(t.short).iso2 : null;
+        const flagHtml = iso2 ? flagImg(iso2) : esc(t.flag || '⬜');
         return `<span class="bv-chip" title="${esc(t.name || '')}">
-            <span class="bv-flag">${esc(t.flag || '⬜')}</span>
+            <span class="bv-flag">${flagHtml}</span>
             <span class="bv-chip-short">${esc(t.short || '?')}</span>
           </span>`;
       })

@@ -7,9 +7,9 @@
 //  Depende de: FIXTURES, TEAMS, GROUPS, calculateStandings(), getTeam()
 //  (todos globales ya cargados desde data.js / app.js).
 //
-//  NOTA: el cruce oficial de "mejores terceros" de FIFA usa una tabla
-//  de combinaciones compleja. Esta v1 hace un sembrado determinista y
-//  transparente; los grupos son estimados (verificar con FIFA).
+//  NOTA: grupos y fixtures son REALES (sorteo oficial 5 dic 2025). El cruce
+//  oficial de "mejores terceros" de FIFA usa una tabla de combinaciones
+//  compleja; esta v1 hace un sembrado determinista y transparente.
 // ============================================================
 
 // ¿Está completa la fase de un grupo? (los 6 partidos con resultado)
@@ -42,10 +42,22 @@ function bestThirds() {
   return thirds.slice(0, 8).map(t => t.team);
 }
 
-// Helper para empaquetar un equipo o un placeholder textual
+// Helper para empaquetar un equipo o un placeholder textual.
+// Los slots de equipo real llevan iso2 (si existe) para banderas reales en la UI;
+// los placeholders quedan sin iso2.
 function slotTeam(team, placeholder) {
-  if (team) return { short: team.shortName, name: team.name, flag: team.flag };
+  if (team) {
+    const iso2 = (typeof getTeam === 'function' ? getTeam(team.shortName)?.iso2 : null) || null;
+    const slot = { short: team.shortName, name: team.name, flag: team.flag };
+    if (iso2) slot.iso2 = iso2;
+    return slot;
+  }
   return { short: null, name: placeholder, flag: '⬜', placeholder: true };
+}
+
+// ¿Ambos lados de un partido tienen equipo real decidido?
+function matchDecided(m) {
+  return !!(m && m.home && m.away && !m.home.placeholder && !m.away.placeholder);
 }
 
 /**
@@ -86,12 +98,16 @@ function computeBracket() {
     { id: 'R32-15', home: R('H'), away: T(7) },
     { id: 'R32-16', home: R('I'), away: R('L') },
   ];
+  // Marca si cada cruce de R32 ya tiene ambos equipos reales decididos.
+  r32.forEach(m => { m.decided = matchDecided(m); });
 
-  // Rondas siguientes: placeholders "Ganador Mxx" (resultados KO = futura mejora)
+  // Rondas siguientes: placeholders "Ganador Mxx" (resultados KO = futura mejora).
+  // decided=false siempre: aún no hay datos/fixtures de eliminatorias.
   const placeholderMatch = (id, a, b) => ({
     id,
     home: { short: null, name: `Ganador ${a}`, flag: '⬜', placeholder: true },
     away: { short: null, name: `Ganador ${b}`, flag: '⬜', placeholder: true },
+    decided: false,
   });
 
   const r16 = [];
