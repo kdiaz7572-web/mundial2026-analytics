@@ -179,16 +179,17 @@ const TEAMS = [
 // homeGoals/awayGoals: null = no jugado, número = resultado
 const FIXTURES = [
   // == GRUPO A ==
-  { id:1,  group:"A", matchday:1, date:"2026-06-11", time:"15:00", home:"USA", away:"MAR", homeGoals:null, awayGoals:null },
-  { id:2,  group:"A", matchday:1, date:"2026-06-11", time:"18:00", home:"URU", away:"PAN", homeGoals:null, awayGoals:null },
+  { id:1,  group:"A", matchday:1, date:"2026-06-12", time:"15:00", home:"USA", away:"MAR", homeGoals:null, awayGoals:null },
+  { id:2,  group:"A", matchday:1, date:"2026-06-12", time:"18:00", home:"URU", away:"PAN", homeGoals:null, awayGoals:null },
   { id:3,  group:"A", matchday:2, date:"2026-06-16", time:"15:00", home:"USA", away:"PAN", homeGoals:null, awayGoals:null },
   { id:4,  group:"A", matchday:2, date:"2026-06-16", time:"18:00", home:"MAR", away:"URU", homeGoals:null, awayGoals:null },
   { id:5,  group:"A", matchday:3, date:"2026-06-23", time:"20:00", home:"USA", away:"URU", homeGoals:null, awayGoals:null },
   { id:6,  group:"A", matchday:3, date:"2026-06-23", time:"20:00", home:"MAR", away:"PAN", homeGoals:null, awayGoals:null },
 
   // == GRUPO B ==
-  { id:7,  group:"B", matchday:1, date:"2026-06-12", time:"15:00", home:"MEX", away:"ECU", homeGoals:null, awayGoals:null },
-  { id:8,  group:"B", matchday:1, date:"2026-06-12", time:"18:00", home:"POL", away:"CMR", homeGoals:null, awayGoals:null },
+  // ⚽ PARTIDO INAUGURAL — México abre el Mundial 2026 (Estadio Azteca, 11 jun)
+  { id:7,  group:"B", matchday:1, date:"2026-06-11", time:"18:00", home:"MEX", away:"ECU", homeGoals:null, awayGoals:null },
+  { id:8,  group:"B", matchday:1, date:"2026-06-12", time:"21:00", home:"POL", away:"CMR", homeGoals:null, awayGoals:null },
   { id:9,  group:"B", matchday:2, date:"2026-06-17", time:"15:00", home:"MEX", away:"POL", homeGoals:null, awayGoals:null },
   { id:10, group:"B", matchday:2, date:"2026-06-17", time:"18:00", home:"ECU", away:"CMR", homeGoals:null, awayGoals:null },
   { id:11, group:"B", matchday:3, date:"2026-06-24", time:"20:00", home:"MEX", away:"CMR", homeGoals:null, awayGoals:null },

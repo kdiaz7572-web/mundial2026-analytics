@@ -10,7 +10,7 @@ const STATE = {
   modelTab: 'goles',
   modelAnalysis: null,
   modelRefType: 'default',
-  calendarView: 'grupos',
+  calendarView: 'calendario',
 };
 
 // ——— Carga de resultados reales (The Odds API, vía /api/fixtures) ———
@@ -565,7 +565,7 @@ function openTeamModal(shortName) {
 
 // ——— CALENDARIO ———
 
-// Toggle Grupos / Eliminatorias
+// Toggle Calendario / Tablas / Eliminatorias
 function calendarViewToggle(active) {
   const btn = (v, label) => `
     <button onclick="setCalendarView('${v}')"
@@ -576,9 +576,10 @@ function calendarViewToggle(active) {
       ${label}
     </button>`;
   return `
-    <div class="flex gap-2">
-      ${btn('grupos', 'Grupos')}
-      ${btn('eliminatorias', 'Eliminatorias')}
+    <div class="flex flex-wrap gap-2">
+      ${btn('calendario', '📅 Calendario')}
+      ${btn('tablas', '📊 Tablas')}
+      ${btn('eliminatorias', '🏆 Eliminatorias')}
     </div>`;
 }
 
@@ -615,204 +616,228 @@ function renderCalendarBracket() {
     </div>`;
 }
 
-function renderCalendar() {
-  const view = STATE.calendarView || 'grupos';
+// Fecha larga legible: "jue 11 jun"
+const fmtDateLong = iso =>
+  new Date(iso + 'T00:00').toLocaleDateString('es-ES', { weekday:'short', day:'2-digit', month:'short' });
 
-  // ——— Sub-vista: Eliminatorias (bracket) ———
-  if (view === 'eliminatorias') {
-    renderCalendarBracket();
-    return;
+// ——— Tarjeta de un partido (reutilizable en Calendario) ———
+function renderMatchCard(f, todayStr, opts = {}) {
+  const h = getTeam(f.home), a = getTeam(f.away);
+  if (!h || !a) return '';
+  const played   = f.homeGoals !== null;
+  const isToday  = f.date === todayStr;
+  const ld       = AppState.getLive(f.id);
+  const isLive   = ld && ['1H','HT','2H'].includes(ld.status);
+  const isSimFT  = !played && ld && ld.status === 'FT';
+
+  let scoreHtml;
+  if (played) {
+    scoreHtml = `
+      <span class="text-lg font-extrabold text-white">${f.homeGoals}</span>
+      <span class="text-slate-500 text-sm">–</span>
+      <span class="text-lg font-extrabold text-white">${f.awayGoals}</span>`;
+  } else if (isLive) {
+    const timeBadge = ld.status === 'HT'
+      ? `<span class="text-xs text-amber-400 font-bold px-1">HT</span>`
+      : `<span class="text-xs text-red-400 font-bold animate-pulse px-1">${ld.elapsed}'</span>`;
+    scoreHtml = `
+      ${timeBadge}
+      <span class="text-lg font-extrabold text-emerald-400">${ld.homeGoals}</span>
+      <span class="text-slate-400 text-sm">–</span>
+      <span class="text-lg font-extrabold text-emerald-400">${ld.awayGoals}</span>`;
+  } else if (isSimFT) {
+    scoreHtml = `
+      <span class="text-[10px] text-slate-500 font-bold mr-0.5">FT</span>
+      <span class="text-lg font-extrabold text-slate-300">${ld.homeGoals}</span>
+      <span class="text-slate-500 text-sm">–</span>
+      <span class="text-lg font-extrabold text-slate-300">${ld.awayGoals}</span>`;
+  } else {
+    scoreHtml = `<span class="text-sm font-bold text-slate-300">${f.time}</span>`;
   }
 
-  const group    = STATE.groupFilter;
-  const fixtures = FIXTURES.filter(f => f.group === group);
+  const liveStatsRow = isLive ? `
+    <div class="flex items-center justify-center gap-3 mt-1.5">
+      <span class="text-[11px] text-slate-400">🚩 <span class="font-semibold">${ld.corners.home}</span>–<span class="font-semibold">${ld.corners.away}</span> córners</span>
+      <span class="text-[11px] text-amber-400">🟨 ${ld.cards.homeYellow + ld.cards.awayYellow}</span>
+      ${(ld.cards.homeRed + ld.cards.awayRed) > 0
+        ? `<span class="text-[11px] text-red-400">🟥 ${ld.cards.homeRed + ld.cards.awayRed}</span>` : ''}
+    </div>` : '';
+
+  const extraClass = (isLive ? 'live-match-card' : isSimFT ? 'sim-ft-card' : '')
+    + (isToday ? ' ring-2 ring-amber-400/70 ring-offset-1 ring-offset-slate-900' : '');
+
+  let footerAction;
+  if (!played && !isLive && !isSimFT) {
+    footerAction = `<span class="text-[11px] text-slate-500 ml-2">Programado</span>`;
+  } else if (isLive) {
+    footerAction = `<span class="text-[11px] text-emerald-400 animate-pulse font-bold ml-2">⚡ EN VIVO</span>`;
+  } else if (isSimFT) {
+    footerAction = `
+      <span class="text-[11px] text-slate-500 ml-2">Sim. completada</span>
+      <button onclick="saveSimResult(${f.id},${ld.homeGoals},${ld.awayGoals})"
+        class="text-[11px] bg-slate-700 hover:bg-slate-600 text-slate-300 px-2 py-0.5 rounded-lg transition-all font-semibold ml-1">
+        ✓ Guardar
+      </button>`;
+  } else {
+    footerAction = '';
+  }
+
+  const groupBadge = opts.showGroup
+    ? `<span class="text-[9px] font-bold text-slate-500 bg-slate-800 px-1.5 py-0.5 rounded">Grupo ${f.group}</span>`
+    : '';
+
+  return `
+  <div id="match-card-${f.id}" class="match-card ${played ? 'played' : ''} ${extraClass}">
+    <div class="flex items-center gap-2">
+      <div class="flex items-center gap-2 flex-1 min-w-0">
+        <span class="text-xl">${h.flag}</span>
+        <span class="text-xs font-semibold text-white truncate">${h.shortName}</span>
+      </div>
+      <div class="flex items-center gap-1 shrink-0">${scoreHtml}</div>
+      <div class="flex items-center gap-2 flex-1 min-w-0 justify-end">
+        <span class="text-xs font-semibold text-white truncate">${a.shortName}</span>
+        <span class="text-xl">${a.flag}</span>
+      </div>
+    </div>
+    ${liveStatsRow}
+    <div class="flex items-center justify-center mt-1 flex-wrap gap-1.5">
+      ${isToday ? `<span class="text-[10px] font-extrabold text-black bg-amber-400 px-1.5 py-0.5 rounded">HOY</span>` : ''}
+      ${groupBadge}
+      <span class="text-xs text-slate-600">${f.time}</span>
+      ${footerAction}
+    </div>
+  </div>`;
+}
+
+// ——— Tabla de posiciones compacta de un grupo ———
+function renderGroupStandingsCard(group) {
   const standings = calculateStandings(group);
+  const jugados = standings.filter(s => s.P > 0).length;
+  return `
+    <div class="card overflow-hidden">
+      <div class="px-4 py-3 border-b border-slate-800 flex items-center justify-between">
+        <h3 class="font-bold text-white text-sm">Grupo ${group}</h3>
+        <span class="text-[11px] text-slate-500">${jugados > 0 ? jugados + ' jugados' : 'Sin jugar'}</span>
+      </div>
+      <table class="w-full standings-table text-sm">
+        <thead>
+          <tr class="bg-slate-900/50">
+            <th class="text-left">#</th>
+            <th class="text-left">Equipo</th>
+            <th>PJ</th><th>GD</th><th class="text-amber-400">Pts</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${standings.map((s, i) => `
+            <tr class="${i < 2 ? (i === 0 ? 'qualified-1' : 'qualified-2') : ''}">
+              <td>${i+1}</td>
+              <td>
+                <div class="flex items-center gap-2">
+                  <span>${s.team.flag}</span>
+                  <span class="font-semibold text-white">${s.team.shortName}</span>
+                </div>
+              </td>
+              <td class="text-center text-slate-400">${s.P}</td>
+              <td class="text-center ${s.GD > 0 ? 'text-green-400' : s.GD < 0 ? 'text-red-400' : 'text-slate-400'}">${s.GD > 0 ? '+' : ''}${s.GD}</td>
+              <td class="text-center font-extrabold text-white">${s.Pts}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>`;
+}
+
+// ——— Sub-vista: TABLAS (las 12 tablas de grupo, separadas del calendario) ———
+function renderAllStandings() {
+  document.getElementById('app-content').innerHTML = `
+    <div class="fade-in space-y-6">
+      <div>
+        <h2 class="section-title">📊 Tablas de Posiciones</h2>
+        <p class="section-subtitle">Clasificación de los 12 grupos — se actualiza con cada resultado</p>
+      </div>
+
+      ${calendarViewToggle('tablas')}
+
+      <div class="flex gap-4 text-xs text-slate-500">
+        <span class="flex items-center gap-1"><span class="w-3 h-3 bg-emerald-500 rounded-sm inline-block"></span> Clasificado 1°</span>
+        <span class="flex items-center gap-1"><span class="w-3 h-3 bg-blue-500 rounded-sm inline-block"></span> Clasificado 2°</span>
+      </div>
+
+      <div class="grid sm:grid-cols-2 xl:grid-cols-3 gap-4">
+        ${GROUPS.map(g => renderGroupStandingsCard(g)).join('')}
+      </div>
+    </div>`;
+}
+
+// ——— Sub-vista: CALENDARIO (todos los partidos, cronológico, HOY primero) ———
+function renderCalendarMatches() {
   const todayStr = new Date().toISOString().slice(0, 10);
+
+  // Ordenar todos los fixtures por fecha + hora y agrupar por fecha
+  const sorted = [...FIXTURES].sort((a, b) =>
+    a.date.localeCompare(b.date) || a.time.localeCompare(b.time)
+  );
+  const byDate = {};
+  sorted.forEach(f => { (byDate[f.date] = byDate[f.date] || []).push(f); });
+
+  const allDates = Object.keys(byDate).sort();
+  // Orden: hoy y futuro ascendente primero, luego días pasados al final
+  const upcoming = allDates.filter(d => d >= todayStr);
+  const past     = allDates.filter(d => d < todayStr);
+  const ordered  = [...upcoming, ...past];
+
+  const dateSection = (date) => {
+    const isToday = date === todayStr;
+    const games   = byDate[date];
+    return `
+      <div class="space-y-3 ${isToday ? 'order-first' : ''}">
+        <div class="flex items-center gap-2 sticky top-0 py-1">
+          <span class="text-sm font-extrabold ${isToday ? 'text-amber-400' : 'text-slate-300'} uppercase tracking-wide">
+            ${fmtDateLong(date)}
+          </span>
+          ${isToday ? `<span class="text-[10px] font-extrabold text-black bg-amber-400 px-2 py-0.5 rounded-full">HOY</span>` : ''}
+          <span class="flex-1 h-px bg-slate-800"></span>
+          <span class="text-[11px] text-slate-600">${games.length} ${games.length === 1 ? 'partido' : 'partidos'}</span>
+        </div>
+        <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-2">
+          ${games.map(f => renderMatchCard(f, todayStr, { showGroup: true })).join('')}
+        </div>
+      </div>`;
+  };
+
+  const todayGames = byDate[todayStr] || [];
+  const todayBanner = todayGames.length > 0
+    ? `<div class="card px-4 py-3 border-l-4 border-amber-500 bg-amber-500/5 text-sm text-amber-100">
+         ⚽ <span class="font-bold">Hoy se juegan ${todayGames.length} ${todayGames.length === 1 ? 'partido' : 'partidos'}</span>
+         ${todayGames.map(f => `${getTeam(f.home)?.shortName} vs ${getTeam(f.away)?.shortName}`).join(' · ')}
+       </div>`
+    : `<div class="card px-4 py-3 border-l-4 border-slate-600 bg-slate-800/30 text-sm text-slate-400">
+         No hay partidos programados para hoy. Próximos abajo.
+       </div>`;
 
   document.getElementById('app-content').innerHTML = `
     <div class="fade-in space-y-6">
       <div>
         <h2 class="section-title">📅 Calendario & Resultados</h2>
-        <p class="section-subtitle">Resultados reales sincronizados a diario</p>
+        <p class="section-subtitle">Resultados reales sincronizados a diario — los de hoy se resaltan automáticamente</p>
       </div>
 
-      ${calendarViewToggle(view)}
+      ${calendarViewToggle('calendario')}
 
-      <!-- Selector de grupo -->
-      <div class="flex flex-wrap gap-2">
-        ${GROUPS.map(g => `
-          <button onclick="filterGroup('${g}')"
-            class="w-10 h-10 rounded-xl font-bold text-sm transition-all
-              ${STATE.groupFilter === g
-                ? 'bg-amber-500 text-black'
-                : 'bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-white'}">
-            ${g}
-          </button>
-        `).join('')}
-      </div>
+      ${todayBanner}
 
-      <div class="grid lg:grid-cols-2 gap-6 calendar-desktop-grid">
-
-        <!-- Tabla de posiciones -->
-        <div class="card overflow-hidden">
-          <div class="px-5 py-4 border-b border-slate-800 flex items-center justify-between">
-            <h3 class="font-bold text-white text-sm">Grupo ${group} — Posiciones</h3>
-            <span class="text-xs text-slate-500">${standings.filter(s => s.P > 0).length > 0 ? standings.filter(s => s.P > 0).length + ' partidos jugados' : 'Sin resultados aún'}</span>
-          </div>
-          <table class="w-full standings-table">
-            <thead>
-              <tr class="bg-slate-900/50">
-                <th class="text-left">#</th>
-                <th class="text-left">Equipo</th>
-                <th>PJ</th><th>PG</th><th>PE</th><th>PP</th>
-                <th>GF</th><th>GC</th><th>GD</th>
-                <th class="text-amber-400">Pts</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${standings.map((s, i) => `
-                <tr class="${i < 2 ? (i === 0 ? 'qualified-1' : 'qualified-2') : ''}">
-                  <td>${i+1}</td>
-                  <td>
-                    <div class="flex items-center gap-2">
-                      <span>${s.team.flag}</span>
-                      <span class="font-semibold text-white hidden sm:inline">${s.team.name}</span>
-                      <span class="font-semibold text-white sm:hidden">${s.team.shortName}</span>
-                    </div>
-                  </td>
-                  <td class="text-center text-slate-400">${s.P}</td>
-                  <td class="text-center text-green-400">${s.W}</td>
-                  <td class="text-center text-amber-400">${s.D}</td>
-                  <td class="text-center text-red-400">${s.L}</td>
-                  <td class="text-center text-slate-300">${s.GF}</td>
-                  <td class="text-center text-slate-300">${s.GA}</td>
-                  <td class="text-center ${s.GD > 0 ? 'text-green-400' : s.GD < 0 ? 'text-red-400' : 'text-slate-400'}">${s.GD > 0 ? '+' : ''}${s.GD}</td>
-                  <td class="text-center font-extrabold text-white">${s.Pts}</td>
-                </tr>
-              `).join('')}
-            </tbody>
-          </table>
-          <div class="px-5 py-2 bg-slate-900/30 flex gap-4 text-xs text-slate-500">
-            <span class="flex items-center gap-1"><span class="w-3 h-3 bg-emerald-500 rounded-sm inline-block"></span> Clasificado 1°</span>
-            <span class="flex items-center gap-1"><span class="w-3 h-3 bg-blue-500 rounded-sm inline-block"></span> Clasificado 2°</span>
-          </div>
-        </div>
-
-        <!-- Partidos del grupo -->
-        <div class="space-y-3">
-          ${[1,2,3]
-            .map(md => ({ md, mdFix: fixtures.filter(f => f.matchday === md) }))
-            .sort((a, b) => {
-              const aT = a.mdFix.some(f => f.date === todayStr) ? 1 : 0;
-              const bT = b.mdFix.some(f => f.date === todayStr) ? 1 : 0;
-              return bT - aT; // jornadas con partidos de HOY primero
-            })
-            .map(({ md, mdFix }) => {
-            const hasToday = mdFix.some(f => f.date === todayStr);
-            return `
-            <div class="card overflow-hidden ${hasToday ? 'ring-1 ring-amber-400/50' : ''}">
-              <div class="px-4 py-3 bg-slate-900/60 border-b border-slate-800 flex items-center justify-between">
-                <span class="text-xs font-bold text-slate-400 uppercase">Jornada ${md}</span>
-                ${hasToday ? `<span class="text-[10px] font-extrabold text-amber-400 uppercase">● Hoy</span>` : ''}
-              </div>
-              <div class="p-3 space-y-2">
-                ${mdFix.map(f => {
-                  const h = getTeam(f.home), a = getTeam(f.away);
-                  const played   = f.homeGoals !== null;
-                  const isToday  = f.date === todayStr;
-                  const ld       = AppState.getLive(f.id);
-                  const isLive   = ld && ['1H','HT','2H'].includes(ld.status);
-                  const isSimFT  = !played && ld && ld.status === 'FT';
-
-                  // ── Marcador central ──────────────────────────────────────
-                  let scoreHtml;
-                  if (played) {
-                    scoreHtml = `
-                      <span class="text-lg font-extrabold text-white">${f.homeGoals}</span>
-                      <span class="text-slate-500 text-sm">–</span>
-                      <span class="text-lg font-extrabold text-white">${f.awayGoals}</span>`;
-                  } else if (isLive) {
-                    const timeBadge = ld.status === 'HT'
-                      ? `<span class="text-xs text-amber-400 font-bold px-1">HT</span>`
-                      : `<span class="text-xs text-red-400 font-bold animate-pulse px-1">${ld.elapsed}'</span>`;
-                    scoreHtml = `
-                      ${timeBadge}
-                      <span class="text-lg font-extrabold text-emerald-400">${ld.homeGoals}</span>
-                      <span class="text-slate-400 text-sm">–</span>
-                      <span class="text-lg font-extrabold text-emerald-400">${ld.awayGoals}</span>`;
-                  } else if (isSimFT) {
-                    scoreHtml = `
-                      <span class="text-[10px] text-slate-500 font-bold mr-0.5">FT</span>
-                      <span class="text-lg font-extrabold text-slate-300">${ld.homeGoals}</span>
-                      <span class="text-slate-500 text-sm">–</span>
-                      <span class="text-lg font-extrabold text-slate-300">${ld.awayGoals}</span>`;
-                  } else {
-                    // Partido aún no jugado: solo hora + estado "Programado".
-                    scoreHtml = `
-                      <span class="text-sm font-bold text-slate-300">${f.time}</span>`;
-                  }
-
-                  // ── Fila de stats en vivo ─────────────────────────────────
-                  const liveStatsRow = isLive ? `
-                    <div class="flex items-center justify-center gap-3 mt-1.5">
-                      <span class="text-[11px] text-slate-400">🚩 <span class="font-semibold">${ld.corners.home}</span>–<span class="font-semibold">${ld.corners.away}</span> córners</span>
-                      <span class="text-[11px] text-amber-400">🟨 ${ld.cards.homeYellow + ld.cards.awayYellow}</span>
-                      ${(ld.cards.homeRed + ld.cards.awayRed) > 0
-                        ? `<span class="text-[11px] text-red-400">🟥 ${ld.cards.homeRed + ld.cards.awayRed}</span>` : ''}
-                    </div>` : '';
-
-                  // ── Clases de la tarjeta ──────────────────────────────────
-                  const extraClass = (isLive
-                    ? 'live-match-card'
-                    : isSimFT
-                    ? 'sim-ft-card'
-                    : '')
-                    + (isToday ? ' ring-2 ring-amber-400/70 ring-offset-1 ring-offset-slate-900' : '');
-
-                  // ── Footer: fecha + acción ────────────────────────────────
-                  let footerAction;
-                  if (!played && !isLive && !isSimFT) {
-                    footerAction = `<span class="text-[11px] text-slate-500 ml-2">Programado</span>`;
-                  } else if (isLive) {
-                    footerAction = `<span class="text-[11px] text-emerald-400 animate-pulse font-bold ml-2">⚡ EN VIVO</span>`;
-                  } else if (isSimFT) {
-                    footerAction = `
-                      <span class="text-[11px] text-slate-500 ml-2">Sim. completada</span>
-                      <button onclick="saveSimResult(${f.id},${ld.homeGoals},${ld.awayGoals})"
-                        class="text-[11px] bg-slate-700 hover:bg-slate-600 text-slate-300 px-2 py-0.5 rounded-lg transition-all font-semibold ml-1">
-                        ✓ Guardar
-                      </button>`;
-                  } else {
-                    footerAction = '';
-                  }
-
-                  return `
-                  <div id="match-card-${f.id}" class="match-card ${played ? 'played' : ''} ${extraClass}">
-                    <div class="flex items-center gap-2">
-                      <div class="flex items-center gap-2 flex-1 min-w-0">
-                        <span class="text-xl">${h.flag}</span>
-                        <span class="text-xs font-semibold text-white truncate">${h.shortName}</span>
-                      </div>
-                      <div class="flex items-center gap-1 shrink-0">${scoreHtml}</div>
-                      <div class="flex items-center gap-2 flex-1 min-w-0 justify-end">
-                        <span class="text-xs font-semibold text-white truncate">${a.shortName}</span>
-                        <span class="text-xl">${a.flag}</span>
-                      </div>
-                    </div>
-                    ${liveStatsRow}
-                    <div class="flex items-center justify-center mt-1 flex-wrap gap-1">
-                      ${isToday ? `<span class="text-[10px] font-extrabold text-black bg-amber-400 px-1.5 py-0.5 rounded">HOY</span>` : ''}
-                      <span class="text-xs text-slate-600">${fmtDate(f.date)} · ${f.time}</span>
-                      ${footerAction}
-                    </div>
-                  </div>`;
-                }).join('')}
-              </div>
-            </div>`;
-          }).join('')}
-        </div>
+      <div class="space-y-8">
+        ${ordered.map(d => dateSection(d)).join('')}
       </div>
     </div>`;
+}
+
+// ——— Router del tab Calendario ———
+function renderCalendar() {
+  const view = STATE.calendarView || 'calendario';
+  if (view === 'eliminatorias') { renderCalendarBracket(); return; }
+  if (view === 'tablas')        { renderAllStandings();   return; }
+  renderCalendarMatches();
 }
 
 function filterGroup(g) {
