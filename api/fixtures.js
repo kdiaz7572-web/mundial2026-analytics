@@ -44,15 +44,20 @@ async function syncRealScores(db) {
   const events = await getWorldCupScores(3);
   if (!events) return { synced: 0, skipped: 0, note: 'The Odds API sin datos / sin key' };
 
-  let synced = 0, skipped = 0;
+  let synced = 0, skipped = 0, notCompleted = 0;
+  const unmappedNames = new Set();
 
   for (const ev of events) {
     // Solo partidos terminados con marcador
-    if (!ev.completed || !Array.isArray(ev.scores)) { skipped++; continue; }
+    if (!ev.completed || !Array.isArray(ev.scores)) { skipped++; notCompleted++; continue; }
 
     const homeShort = toShort(ev.home_team);
     const awayShort = toShort(ev.away_team);
-    if (!homeShort || !awayShort) { skipped++; continue; }
+    if (!homeShort || !awayShort) {
+      if (!homeShort) unmappedNames.add(ev.home_team);
+      if (!awayShort) unmappedNames.add(ev.away_team);
+      skipped++; continue;
+    }
 
     // scores: [{name, score}] — emparejar por nombre
     let hg = null, ag = null;
@@ -78,7 +83,11 @@ async function syncRealScores(db) {
       console.warn('[fixtures] insert error', fixtureId, e.message);
     }
   }
-  return { synced, skipped, total_events: events.length };
+  return {
+    synced, skipped, not_completed: notCompleted,
+    total_events: events.length,
+    unmapped_names: [...unmappedNames],
+  };
 }
 
 export default async function handler(req, res) {
