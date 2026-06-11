@@ -30,6 +30,126 @@
 
   <!-- Estilos propios -->
   <link rel="stylesheet" href="css/styles.css" />
+
+  <!-- Bracket view (llaves) — estilos estructurales scoped a .bracket-wrap -->
+  <style>
+    .bracket-wrap { color: #e2e8f0; font-size: 13px; }
+
+    /* Header + título */
+    .bracket-wrap .bv-header {
+      display: flex; flex-wrap: wrap; align-items: center;
+      justify-content: space-between; gap: 12px; margin-bottom: 14px;
+    }
+    .bracket-wrap .bv-title {
+      font-size: 18px; font-weight: 800; color: #fff; margin: 0;
+    }
+
+    /* Banner provisional */
+    .bracket-wrap .bv-banner {
+      display: flex; gap: 10px; align-items: flex-start;
+      background: rgba(245, 158, 11, 0.08);
+      border: 1px solid rgba(245, 158, 11, 0.35);
+      border-radius: 10px; padding: 10px 12px; margin-bottom: 16px;
+    }
+    .bracket-wrap .bv-banner-icon { font-size: 16px; line-height: 1.2; }
+    .bracket-wrap .bv-banner-text { display: flex; flex-direction: column; gap: 2px; }
+    .bracket-wrap .bv-banner-strong { color: #fbbf24; font-weight: 700; font-size: 13px; }
+    .bracket-wrap .bv-banner-note { color: #94a3b8; font-size: 12px; }
+
+    /* Chips mejores terceros */
+    .bracket-wrap .bv-thirds { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .bracket-wrap .bv-thirds-label {
+      font-size: 11px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.04em; color: #64748b;
+    }
+    .bracket-wrap .bv-thirds-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+    .bracket-wrap .bv-chip {
+      display: inline-flex; align-items: center; gap: 4px;
+      background: #1e293b; border: 1px solid #334155;
+      border-radius: 999px; padding: 3px 8px; font-size: 12px;
+    }
+    .bracket-wrap .bv-chip-short { font-weight: 700; color: #cbd5e1; }
+
+    /* Contenedor scrollable horizontal (móvil) */
+    .bracket-wrap .bv-scroll { overflow-x: auto; padding-bottom: 8px; }
+
+    /* Árbol = columnas lado a lado */
+    .bracket-wrap .bv-tree {
+      display: flex; gap: 18px; align-items: stretch; min-width: min-content;
+    }
+
+    /* Columna por ronda */
+    .bracket-wrap .bv-col {
+      display: flex; flex-direction: column; min-width: 150px; flex: 0 0 auto;
+    }
+    .bracket-wrap .bv-col-head {
+      font-size: 11px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.05em; color: #94a3b8; text-align: center;
+      padding-bottom: 8px; margin-bottom: 8px;
+      border-bottom: 1px solid #334155;
+    }
+    .bracket-wrap .bv-col-head-final { color: #f59e0b; border-color: rgba(245,158,11,0.5); }
+    /* Cuerpo: reparte cards con espacio creciente (árbol de torneo) */
+    .bracket-wrap .bv-col-body {
+      display: flex; flex-direction: column;
+      justify-content: space-around; flex: 1; gap: 10px;
+    }
+
+    /* Card de partido */
+    .bracket-wrap .bv-card {
+      background: #0f172a; border: 1px solid #334155;
+      border-radius: 10px; padding: 7px 9px;
+      display: flex; flex-direction: column; gap: 4px;
+    }
+    .bracket-wrap .bv-card-final {
+      border-color: #f59e0b; background: rgba(245, 158, 11, 0.06);
+      box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.25);
+    }
+    .bracket-wrap .bv-card-third { border-color: #475569; border-style: dashed; }
+    .bracket-wrap .bv-divider { height: 1px; background: #1e293b; }
+
+    /* Slot (fila equipo) */
+    .bracket-wrap .bv-slot {
+      display: flex; align-items: center; gap: 7px; min-height: 22px;
+    }
+    .bracket-wrap .bv-flag { font-size: 15px; line-height: 1; flex: 0 0 auto; }
+    .bracket-wrap .bv-short { font-weight: 800; color: #f1f5f9; font-size: 13px; }
+    .bracket-wrap .bv-name {
+      color: #64748b; font-size: 12px; overflow: hidden;
+      text-overflow: ellipsis; white-space: nowrap;
+    }
+    .bracket-wrap .bv-slot-ph { opacity: 0.65; }
+    .bracket-wrap .bv-slot-ph .bv-ph-text {
+      color: #64748b; font-size: 12px; font-style: italic;
+      border-bottom: 1px dashed #475569; padding-bottom: 1px;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+
+    /* Bloque 3er puesto */
+    .bracket-wrap .bv-third-block { margin-top: 18px; max-width: 230px; }
+    .bracket-wrap .bv-col-head-third { color: #cbd5e1; text-align: left; }
+
+    /* Estado vacío */
+    .bracket-wrap .bv-empty {
+      text-align: center; padding: 48px 20px; color: #94a3b8;
+    }
+    .bracket-wrap .bv-empty-icon { font-size: 40px; display: block; margin-bottom: 10px; opacity: 0.6; }
+    .bracket-wrap .bv-empty-title { font-weight: 700; color: #cbd5e1; font-size: 15px; margin: 0 0 4px; }
+    .bracket-wrap .bv-empty-msg { font-size: 13px; margin: 0; }
+
+    /* Desktop: la Final queda junto al 3er puesto en una columna lógica */
+    @media (min-width: 768px) {
+      .bracket-wrap .bv-scroll { display: flex; align-items: flex-start; gap: 18px; }
+      .bracket-wrap .bv-tree { flex: 1; }
+      .bracket-wrap .bv-third-block { margin-top: 0; align-self: center; }
+    }
+
+    /* Móvil: el árbol scrollea horizontalmente; texto legible */
+    @media (max-width: 767px) {
+      .bracket-wrap .bv-col { min-width: 138px; }
+      .bracket-wrap .bv-col-body { justify-content: flex-start; }
+    }
+  </style>
 </head>
 
 <body class="bg-[#080c18] text-slate-100 min-h-screen">
@@ -135,6 +255,8 @@
   <script src="js/chat_ui.js"></script>           <!-- Chat interface component -->
   <script src="js/learning_dashboard.js"></script> <!-- Learning metrics dashboard -->
   <script src="js/state_guard.js"></script>       <!-- Module validation & safety -->
+  <script src="js/bracket_engine.js"></script>    <!-- Eliminatorias / brackets 2026 -->
+  <script src="js/bracket_view.js"></script>      <!-- Render visual del árbol de llaves -->
   <script src="js/app.js"></script>
   <script src="js/db_sync.js"></script>   <!-- Vercel Postgres bridge -->
 </body>

@@ -8,6 +8,10 @@
   },
   "crons": [
     {
+      "path": "/api/fixtures",
+      "schedule": "0 6 * * *"
+    },
+    {
       "path": "/api/ferxxxa-markets",
       "schedule": "0 7 * * *"
     },

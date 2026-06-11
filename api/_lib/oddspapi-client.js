@@ -111,6 +111,34 @@ export async function getUpcomingMatches() {
 }
 
 /**
+ * Get REAL scores (live + completed) for the World Cup from The Odds API.
+ * Endpoint: /v4/sports/{sport}/scores?daysFrom=3
+ * Returns raw events: { id, commence_time, completed, home_team, away_team,
+ *                       scores: [{ name, score }] | null }
+ */
+export async function getWorldCupScores(daysFrom = 3) {
+  if (!THE_ODDS_API_KEY) {
+    console.warn('[OddsAPI] ODDS_API_KEY not configured (scores)');
+    return null;
+  }
+  try {
+    const resp = await fetch(
+      `${THE_ODDS_API_BASE}/sports/soccer_fifa_world_cup/scores?apiKey=${THE_ODDS_API_KEY}&daysFrom=${daysFrom}`,
+      { signal: AbortSignal.timeout(8000) }
+    );
+    if (!resp.ok) {
+      console.warn(`[OddsAPI] scores HTTP ${resp.status}`);
+      return null;
+    }
+    const events = await resp.json();
+    return Array.isArray(events) ? events : null;
+  } catch (err) {
+    console.warn('[OddsAPI] getWorldCupScores error:', err.message);
+    return null;
+  }
+}
+
+/**
  * Parse a The Odds API event into our standard markets format
  */
 function parseTheOddsApiEvent(event) {
