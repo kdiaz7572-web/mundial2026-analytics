@@ -98,6 +98,17 @@ export default async function handler(req, res) {
   const isCron = !!req.headers['x-vercel-cron'];
   const forceSync = req.query.sync === '1' || isCron;
 
+  // ── Debug temporal: ver el calendario REAL crudo de The Odds API ──
+  if (req.query.peek) {
+    const events = await getWorldCupScores(7);
+    const sample = (events || []).map(e => ({
+      home: e.home_team, away: e.away_team,
+      commence: e.commence_time, completed: e.completed,
+      scores: e.scores,
+    }));
+    return res.status(200).json({ ok: true, count: sample.length, events: sample });
+  }
+
   try {
     const db = await getDb();
 
