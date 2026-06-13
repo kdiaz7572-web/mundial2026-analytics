@@ -421,7 +421,18 @@ function mmAnalyzeMatch(homeKey, awayKey, refType = 'default') {
     ? refType
     : (REFEREE_PROFILES[refType] || REFEREE_PROFILES.default);
 
-  const { home: lH, away: lA } = mmLambdas(hExt, aExt);
+  let { home: lH, away: lA } = mmLambdas(hExt, aExt);
+
+  // ── Capa de optimización analítica: ranking FIFA + forma 12 partidos ──
+  //   Ajuste acotado (±15%, "balanceado") sobre λ. No altera la API ni el
+  //   modelo Poisson; solo desplaza los Expected Goals según anclaje.
+  let predictiveWeights = null;
+  if (typeof applyPredictiveWeights === 'function') {
+    const pw = applyPredictiveWeights(lH, lA, hTeam, aTeam);
+    lH = pw.home; lA = pw.away;
+    predictiveWeights = pw.breakdown;
+  }
+
   const matrix = mmScoreMatrix(lH, lA);
   const r1x2   = mm1X2(matrix);
   const corners = mmCorners(hExt, aExt);
@@ -434,6 +445,7 @@ function mmAnalyzeMatch(homeKey, awayKey, refType = 'default') {
       timestamp: new Date().toISOString(),
     },
     lambdas:      { home: _p2(lH), away: _p2(lA), total: _p2(lH + lA) },
+    predictive_weights: predictiveWeights,
     result_1x2:   r1x2,
     double_chance: mmDoubleChance(r1x2),
     over_under:   mmOU(matrix),
