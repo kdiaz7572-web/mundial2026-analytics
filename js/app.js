@@ -36,6 +36,28 @@ async function loadRealResults() {
   }
 }
 
+// ——— Carga de forma reciente REAL (API-Football, vía /api/football?action=form) ———
+// Pobla TEAMS[k].recentForm con W/D/L reales para que la capa predictiva
+// (ranking + forma) use datos reales en vez del placeholder uniforme.
+const _formLoaded = new Set();
+async function ensureTeamForm(keys) {
+  await Promise.all((keys || []).filter(Boolean).map(async (key) => {
+    if (_formLoaded.has(key)) return;
+    _formLoaded.add(key);
+    try {
+      const res  = await fetch(`/api/football?action=form&team=${encodeURIComponent(key)}`);
+      const data = await res.json();
+      if (data && Array.isArray(data.recentForm) && data.recentForm.length) {
+        const t = getTeam(key);
+        if (t) { t.recentForm = data.recentForm; t._formMeta = { gf: data.gf_avg, ga: data.ga_avg, cs: data.clean_sheets, n: data.official_count, source: data.source }; }
+      }
+    } catch (e) {
+      _formLoaded.delete(key); // permite reintento
+      console.warn('ensureTeamForm', key, e.message);
+    }
+  }));
+}
+
 const TABS = [
   { id: 'dashboard',  label: '📊 Dashboard' },
   { id: 'equipos',    label: '🌍 Equipos' },
@@ -2001,8 +2023,10 @@ function runModelAnalysis() {
   const btn = document.getElementById('btn-analyze') || document.querySelector('.btn-analyze');
   if (btn) { btn.textContent = '⏳ Calculando…'; btn.disabled = true; }
 
-  setTimeout(() => {
+  setTimeout(async () => {
     try {
+      // Cargar forma reciente REAL de ambas selecciones antes de analizar
+      await ensureTeamForm([homeKey, awayKey]);
       // Obtener perfil dinámico del árbitro
       const refProfile = RefEngine.getProfile(refId);
       // Correr modelo con el perfil real (objeto, no string)

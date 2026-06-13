@@ -30,6 +30,123 @@ const NATIONAL_TEAM_IDS = {
   MAR: 35, SEN: 14, JPN: 29, KOR: 149, CRO: 3, SUI: 15,
 };
 
+// shortName → nombre de búsqueda en API-Football (selecciones nacionales)
+const FORM_SEARCH = {
+  MEX:'Mexico', RSA:'South Africa', KOR:'South Korea', CZE:'Czech Republic',
+  CAN:'Canada', BIH:'Bosnia', QAT:'Qatar', SUI:'Switzerland', USA:'USA', PAR:'Paraguay',
+  BRA:'Brazil', MAR:'Morocco', HAI:'Haiti', SCO:'Scotland', AUS:'Australia', TUR:'Turkey',
+  GER:'Germany', CUW:'Curacao', CIV:'Ivory Coast', ECU:'Ecuador', NED:'Netherlands', JPN:'Japan',
+  SWE:'Sweden', TUN:'Tunisia', ESP:'Spain', CPV:'Cape Verde', KSA:'Saudi Arabia', URU:'Uruguay',
+  BEL:'Belgium', EGY:'Egypt', IRN:'Iran', NZL:'New Zealand', FRA:'France', SEN:'Senegal',
+  IRQ:'Iraq', NOR:'Norway', ARG:'Argentina', ALG:'Algeria', AUT:'Austria', JOR:'Jordan',
+  POR:'Portugal', COD:'Congo DR', ENG:'England', CRO:'Croatia', GHA:'Ghana', PAN:'Panama',
+  UZB:'Uzbekistan', COL:'Colombia',
+};
+
+const AF_HEADERS = key => ({ 'x-rapidapi-key': key, 'x-rapidapi-host': 'v3.football.api-sports.io' });
+
+// Resuelve el ID de la selección nacional (cacheado en team_form.api_team_id)
+async function resolveTeamId(db, key, apiKey) {
+  const cached = await db`SELECT api_team_id FROM team_form WHERE team_key = ${key}`;
+  if (cached[0]?.api_team_id) return cached[0].api_team_id;
+
+  const name = FORM_SEARCH[key] || key;
+  const r = await fetch(`https://v3.football.api-sports.io/teams?search=${encodeURIComponent(name)}`, { headers: AF_HEADERS(apiKey) });
+  const j = await r.json();
+  const list = (j.response || []).filter(t => t.team?.national);
+  if (!list.length) return null;
+  // mejor match por nombre, si no el primero nacional
+  const exact = list.find(t => (t.team.name || '').toLowerCase() === name.toLowerCase());
+  return (exact || list[0]).team.id;
+}
+
+async function fetchSeasonFixtures(apiKey, teamId, year) {
+  const r = await fetch(`https://v3.football.api-sports.io/fixtures?team=${teamId}&season=${year}`, { headers: AF_HEADERS(apiKey) });
+  const j = await r.json();
+  return Array.isArray(j.response) ? j.response : [];
+}
+
+// Calcula forma desde la perspectiva del equipo (más reciente primero)
+function computeForm(fixtures, teamId) {
+  const finished = fixtures.filter(f => ['FT','AET','PEN'].includes(f.fixture?.status?.short));
+  // Solo oficiales (excluye amistosos); si quedan muy pocos, se reincluyen amistosos
+  const official = finished.filter(f => !/friendl/i.test(f.league?.name || ''));
+  let used = official.length >= 6 ? official : finished;
+  used = used.sort((a, b) => new Date(b.fixture.date) - new Date(a.fixture.date)).slice(0, 12);
+
+  const form = [], sample = [];
+  let gf = 0, ga = 0, cs = 0;
+  for (const f of used) {
+    const isHome = f.teams.home.id === teamId;
+    const my = isHome ? f.goals.home : f.goals.away;
+    const opp = isHome ? f.goals.away : f.goals.home;
+    if (my == null || opp == null) continue;
+    form.push(my > opp ? 'W' : my < opp ? 'L' : 'D');
+    gf += my; ga += opp; if (opp === 0) cs++;
+    sample.push(`${f.fixture.date.slice(0,10)} ${f.teams.home.name} ${f.goals.home}-${f.goals.away} ${f.teams.away.name}`);
+  }
+  const n = form.length || 1;
+  return {
+    recentForm: form,
+    gf_avg: +(gf / n).toFixed(2),
+    ga_avg: +(ga / n).toFixed(2),
+    clean_sheets: cs,
+    official_count: official.length,
+    sample,
+  };
+}
+
+async function handleForm(req, res, apiKey, key) {
+  if (!key || !FORM_SEARCH[key]) {
+    return res.status(400).json({ ok: false, error: `team requerido (shortName válido). Ej: ?action=form&team=ARG` });
+  }
+  try {
+    const db = await getDb();
+
+    // Cache 7 días
+    const cached = await db`SELECT * FROM team_form WHERE team_key = ${key}`;
+    if (cached[0]?.recent_form && (Date.now() - new Date(cached[0].fetched_at)) < 7 * 864e5) {
+      return res.json({ ok: true, source: 'db_cache', team: key, ...rowToForm(cached[0]) });
+    }
+
+    const teamId = await resolveTeamId(db, key, apiKey);
+    if (!teamId) {
+      if (cached[0]) return res.json({ ok: true, source: 'db_stale', team: key, ...rowToForm(cached[0]) });
+      return res.json({ ok: true, source: 'unresolved', team: key, recentForm: [], note: 'No se pudo resolver el equipo en API-Football' });
+    }
+
+    let fixtures = await fetchSeasonFixtures(apiKey, teamId, 2024);
+    let f = computeForm(fixtures, teamId);
+    if (f.recentForm.length < 8) {
+      const prev = await fetchSeasonFixtures(apiKey, teamId, 2023);
+      f = computeForm(fixtures.concat(prev), teamId);
+    }
+
+    await db`
+      INSERT INTO team_form (team_key, api_team_id, recent_form, gf_avg, ga_avg, clean_sheets, official_count, sample, fetched_at)
+      VALUES (${key}, ${teamId}, ${JSON.stringify(f.recentForm)}, ${f.gf_avg}, ${f.ga_avg}, ${f.clean_sheets}, ${f.official_count}, ${JSON.stringify(f.sample)}, NOW())
+      ON CONFLICT (team_key) DO UPDATE SET
+        api_team_id = ${teamId}, recent_form = ${JSON.stringify(f.recentForm)},
+        gf_avg = ${f.gf_avg}, ga_avg = ${f.ga_avg}, clean_sheets = ${f.clean_sheets},
+        official_count = ${f.official_count}, sample = ${JSON.stringify(f.sample)}, fetched_at = NOW()
+    `;
+
+    return res.json({ ok: true, source: 'api-football', team: key, api_team_id: teamId, ...f });
+  } catch (err) {
+    console.error('[/api/football form]', err);
+    return res.status(200).json({ ok: true, source: 'error', team: key, recentForm: [], error: err.message });
+  }
+}
+
+function rowToForm(row) {
+  return {
+    recentForm: row.recent_form || [],
+    gf_avg: Number(row.gf_avg), ga_avg: Number(row.ga_avg),
+    clean_sheets: row.clean_sheets, official_count: row.official_count,
+    sample: row.sample || [],
+  };
+}
+
 export default async function handler(req, res) {
   // CORS preflight
   if (req.method === 'OPTIONS') { res.status(200).end(); return; }
@@ -48,6 +165,11 @@ export default async function handler(req, res) {
       note: 'FOOTBALL_API_KEY not configured — serving local data',
       data: getLocalFallback(action, team),
     });
+  }
+
+  // ── Forma reciente real (últimos ~12 oficiales) ───────────
+  if (action === 'form') {
+    return await handleForm(req, res, API_KEY, (team || '').toUpperCase());
   }
 
   // ── Con API key → llama a api-football.com ────────────────
@@ -73,26 +195,6 @@ export default async function handler(req, res) {
         endpoint = `https://v3.football.api-sports.io/players?id=${id}&season=${season}`;
         cacheKey  = `player:${id}:${season}`;
         break;
-      }
-      case 'fixtures': {
-        // World Cup = league 1. season=2026 para el Mundial 2026.
-        endpoint = `https://v3.football.api-sports.io/fixtures?league=1&season=${season}`;
-        cacheKey  = `fixtures:${season}`;
-        break;
-      }
-      case 'standings': {
-        endpoint = `https://v3.football.api-sports.io/standings?league=1&season=${season}`;
-        cacheKey  = `standings:${season}`;
-        break;
-      }
-      case '_debug_raw': {
-        // Temporal: prueba directa a un endpoint arbitrario para validar acceso del plan
-        const ep = req.query.endpoint || 'status';
-        const r = await fetch(`https://v3.football.api-sports.io/${ep}`, {
-          headers: { 'x-rapidapi-key': API_KEY, 'x-rapidapi-host': 'v3.football.api-sports.io' },
-        });
-        const j = await r.json();
-        return res.status(r.status).json({ ok: r.ok, status: r.status, body: j });
       }
       default:
         return res.status(400).json({ ok: false, error: `Unknown action: ${action}` });

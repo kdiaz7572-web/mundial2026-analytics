@@ -126,6 +126,22 @@ async function migrate(sql) {
     )
   `;
 
+  // ── Forma reciente real por selección (API-Football, season 2024/2023) ──
+  await sql`
+    CREATE TABLE IF NOT EXISTS team_form (
+      team_key        TEXT PRIMARY KEY,
+      api_team_id     INTEGER,
+      recent_form     JSONB,
+      gf_avg          NUMERIC(4,2),
+      ga_avg          NUMERIC(4,2),
+      clean_sheets    INTEGER,
+      official_count  INTEGER,
+      sample          JSONB,
+      source          TEXT DEFAULT 'api-football',
+      fetched_at      TIMESTAMPTZ DEFAULT NOW()
+    )
+  `;
+
   // ── Player stats snapshots (from api-football.com) ────
   await sql`
     CREATE TABLE IF NOT EXISTS player_stats (
