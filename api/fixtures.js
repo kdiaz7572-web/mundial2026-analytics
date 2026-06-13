@@ -92,6 +92,25 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   if (req.method === 'OPTIONS') { res.status(200).end(); return; }
 
+  // POST → guardar la "combinada del día" (reportada desde DoradoBet) en zak_intel,
+  // para que IA-Zak la responda cuando el usuario pregunte por la mejor combinada de hoy.
+  if (req.method === 'POST') {
+    try {
+      const db = await getDb();
+      const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
+      const content = body.combinada || body.content;
+      if (!content) return res.status(400).json({ ok: false, error: 'Falta "combinada" en el body' });
+      await db`DELETE FROM zak_intel WHERE topic = 'combinada_hoy'`;
+      await db`
+        INSERT INTO zak_intel (topic, match_id, content, summary_json, studied_at)
+        VALUES ('combinada_hoy', ${body.date || 'hoy'}, ${content}, ${JSON.stringify(body.details || {})}, NOW())
+      `;
+      return res.status(200).json({ ok: true, stored: true });
+    } catch (e) {
+      return res.status(500).json({ ok: false, error: e.message });
+    }
+  }
+
   // Cron de Vercel manda header especial; también aceptamos ?sync=1 manual
   const isCron = !!req.headers['x-vercel-cron'];
   const forceSync = req.query.sync === '1' || isCron;

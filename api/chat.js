@@ -1517,6 +1517,21 @@ FERXXXA DORADOBET INTELLIGENCE: Temporarily unavailable (${e.message})
     // Append FerXxxa context to userContext
     userContext += ferxxxaContext;
 
+    // ── Combinada del día (reportada desde DoradoBet con cuotas reales) ──
+    if (/combinad|parlay/i.test(sanitizedMessage)) {
+      try {
+        const cdb = await getDb();
+        const comboRes = await cdb`
+          SELECT content, studied_at FROM zak_intel
+          WHERE topic = 'combinada_hoy'
+          ORDER BY studied_at DESC LIMIT 1
+        `;
+        if (comboRes && comboRes[0]) {
+          userContext += `\n\nCOMBINADA DEL DÍA — cuotas REALES de DoradoBet (úsala como base directa para responder cuál es la mejor combinada de hoy; respétala salvo que el modelo claramente la contradiga):\n${comboRes[0].content}`;
+        }
+      } catch (e) { console.warn('[chat] combinada fetch:', e.message); }
+    }
+
     // =====================================================
     // 2.2 Inject player analysis into system prompt if detected
     // =====================================================
