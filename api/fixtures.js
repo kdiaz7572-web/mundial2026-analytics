@@ -102,8 +102,8 @@ export default async function handler(req, res) {
       if (!content) return res.status(400).json({ ok: false, error: 'Falta "combinada" en el body' });
       await db`DELETE FROM zak_intel WHERE topic = 'combinada_hoy'`;
       await db`
-        INSERT INTO zak_intel (topic, match_id, content, summary_json, studied_at)
-        VALUES ('combinada_hoy', ${body.date || 'hoy'}, ${content}, ${JSON.stringify(body.details || {})}, NOW())
+        INSERT INTO zak_intel (topic, content, summary_json, studied_at)
+        VALUES ('combinada_hoy', ${content}, ${JSON.stringify({ date: body.date || 'hoy', ...(body.details || {}) })}, NOW())
       `;
       return res.status(200).json({ ok: true, stored: true });
     } catch (e) {
