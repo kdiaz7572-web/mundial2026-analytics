@@ -1373,6 +1373,12 @@ export default async function handler(req, res) {
     if (detectedMarket.mustAvoid.length > 0) {
       userContext += `\n- PROHIBIDO sugerir: ${detectedMarket.mustAvoid.join(', ')} (el usuario NO preguntó por eso)`;
     }
+    if (detectedMarket.market === 'exact_score') {
+      userContext += `\n- FORMATO OBLIGATORIO (anula el modo compacto SOLO para marcador exacto): responde con los 3 escenarios etiquetados, cada uno con el marcador usando nombres reales y una justificación de 1 línea con datos:
+🟢 Fácil/Seguro: [Equipo1] X-Y [Equipo2] — (motivo breve)
+🔵 Conservador: [Equipo1] X-Y [Equipo2] — (motivo breve)
+🔴 Arriesgado: [Equipo1] X-Y [Equipo2] — (value bet, motivo breve)`;
+    }
 
     // =====================================================
     // 2.0.1 DETECT SUBJECT: jugador, equipo de club, o selección
