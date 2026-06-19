@@ -1374,10 +1374,11 @@ export default async function handler(req, res) {
       userContext += `\n- PROHIBIDO sugerir: ${detectedMarket.mustAvoid.join(', ')} (el usuario NO preguntó por eso)`;
     }
     if (detectedMarket.market === 'exact_score') {
-      userContext += `\n- FORMATO OBLIGATORIO (anula el modo compacto SOLO para marcador exacto): responde con los 3 escenarios etiquetados, cada uno con el marcador usando nombres reales y una justificación de 1 línea con datos:
-🟢 Fácil/Seguro: [Equipo1] X-Y [Equipo2] — (motivo breve)
-🔵 Conservador: [Equipo1] X-Y [Equipo2] — (motivo breve)
-🔴 Arriesgado: [Equipo1] X-Y [Equipo2] — (value bet, motivo breve)`;
+      userContext += `\n- FORMATO OBLIGATORIO MARCADOR EXACTO (anula el modo compacto): el campo "response" DEBE contener LITERALMENTE estas 3 líneas (es lo único que ve el usuario; NO las pongas en reasoning_chain). Usa nombres reales y salto de línea \\n entre cada una:
+🟢 Fácil: <Equipo1> X-Y <Equipo2> — motivo breve con datos
+🔵 Conservador: <Equipo1> X-Y <Equipo2> — motivo breve
+🔴 Arriesgado: <Equipo1> X-Y <Equipo2> — value bet, motivo breve
+NO devuelvas un titular tipo "3 escenarios de marcador exacto"; devuelve las 3 líneas completas con los marcadores reales.`;
     }
 
     // =====================================================
